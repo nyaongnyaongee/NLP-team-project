@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")  # backend/ 에서 실행
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")  # backend/ 에서 실행
 
     database_url: str
     jwt_secret: str
