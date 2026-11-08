@@ -131,6 +131,7 @@ function panel(title, defaultLogin) {
 
 const grid = document.getElementById("grid");
 grid.append(panel("학부모 화면", "parent1"), panel("교사 화면", "teacher1"));
+grid.querySelectorAll(".go").forEach(b => b.click());  // 열자마자 자동 로그인
 </script>
 </body>
 </html>

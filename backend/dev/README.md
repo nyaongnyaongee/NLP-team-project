@@ -4,16 +4,11 @@
 서비스 화면(`frontend/`)이 아니다. 프론트가 나오면 필요 없어진다.
 
 ```bash
-# 터미널 1: 백엔드 (PostgreSQL 이 켜져 있어야 함)
-cd backend && source .venv/bin/activate
-python -m app.db.seed                       # 처음 한 번 (테스트 계정)
-uvicorn app.main:app --port 8000
-
-# 터미널 2: 이 화면 (CORS 에 허용된 5173 포트로 열어야 함)
-cd backend/dev && python3 -m http.server 5173
+cd backend && python3 dev/dev.py      # 한 번에 켜짐 (Windows 는 python). 끄기: Ctrl+C
 ```
 
-Windows 는 `source .venv/bin/activate` 대신 `.venv\Scripts\activate`, `python3` 대신 `python` 을 쓴다.
+PostgreSQL · 백엔드(8000) · 이 화면(5173) 을 순서대로 켜고, 브라우저가 열리면 학부모 · 교사 칸이 이미 로그인돼 있다.
+Ctrl+C 로 끄면 PostgreSQL 까지 같이 꺼진다 (Mac 에서 이 스크립트가 켰을 때). `backend/.venv` 는 먼저 만들어 둬야 한다.
 
-브라우저에서 http://localhost:5173 → 양쪽 [로그인] → 왼쪽에서 보내면 오른쪽에 2초 안에 뜬다.
+왼쪽(학부모)에서 보내면 오른쪽에 2초 안에 뜬다.
 계정: `parent1` · `parent2` · `teacher1`, 비밀번호 `test1234`.
