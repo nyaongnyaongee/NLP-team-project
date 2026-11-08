@@ -1,0 +1,106 @@
+{
+  "type": "object",
+  "properties": {
+    "abusive": {
+      "type": "boolean"
+    },
+    "quotes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "topic": {
+      "type": "string",
+      "enum": [
+        "친구 관계 · 학교폭력",
+        "생활지도 · 벌점",
+        "학습 · 평가",
+        "숙제 · 준비물",
+        "일정 · 행사 · 공지",
+        "건강 · 안전",
+        "급식",
+        "출결 · 조퇴",
+        "자리 · 학급 운영",
+        "교사 언행",
+        "감사 · 안부",
+        "기타"
+      ]
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "경위 설명",
+              "사과",
+              "조치 · 재발 방지",
+              "취소 · 정정",
+              "배상",
+              "자리 · 짝 · 모둠 변경",
+              "정보 문의",
+              "상담 · 면담",
+              "건강 · 생활 배려",
+              "담임 교체",
+              "기타"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "threats": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "아동학대 신고",
+          "경찰",
+          "고소 · 법적 대응",
+          "교육청",
+          "교장 · 교감",
+          "맘카페 · 학부모 단톡",
+          "언론",
+          "녹음 · 증거",
+          "학교 방문",
+          "신변 위협",
+          "막연한 경고",
+          "기타"
+        ]
+      }
+    },
+    "deadline": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "refined": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "abusive",
+    "quotes",
+    "topic",
+    "requests",
+    "threats",
+    "deadline",
+    "refined"
+  ],
+  "additionalProperties": false
+}
