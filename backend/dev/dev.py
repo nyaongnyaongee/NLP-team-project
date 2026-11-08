@@ -1,6 +1,6 @@
 """개발용 확인 화면을 한 번에 켠다.   실행: cd backend && python3 dev/dev.py   (끄기: Ctrl+C)
 
-PostgreSQL → 백엔드(8000) → 확인 화면(5173) → 브라우저 순서로 켜고,
+PostgreSQL → DB · 테이블 · 테스트 계정 → 백엔드(8000) → 확인 화면(5173) → 브라우저 순서로 켜고,
 Ctrl+C 로 끄면 이 스크립트가 켠 것만 같이 끈다.  venv 를 따로 켜지 않아도 된다.
 """
 import shutil
@@ -37,7 +37,28 @@ def _stop(signum, frame):
     raise KeyboardInterrupt  # 터미널을 닫아도 (SIGHUP) · kill 해도 (SIGTERM) 같은 정리 경로로
 
 
+def check_env():
+    env = BACKEND / ".env"
+    if not env.exists():
+        sys.exit("backend/.env 가 없습니다. 먼저 만드세요:  copy .env.example .env  (Mac: cp)  그리고 열어서 값을 채우세요.")
+    values = {}
+    for line in env.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:  # 주석 줄은 무시
+            k, v = line.split("=", 1)
+            values[k.strip()] = v.strip()
+    db = values.get("DATABASE_URL", "")
+    if not db or "Mac사용자이름" in db or "비밀번호@" in db:
+        sys.exit("backend/.env 의 DATABASE_URL 이 비어 있거나 예시 그대로입니다. 본인 값으로 바꾸세요 (.env.example 위쪽 안내 참고).")
+    if not values.get("JWT_SECRET"):
+        sys.exit("backend/.env 의 JWT_SECRET 이 비어 있습니다. 아무 긴 문자열을 넣으세요 (.env.example 안내 참고).")
+
+
 def main():
+    if hasattr(sys.stdout, "reconfigure"):  # 한국어 Windows 콘솔(cp949)에서 특수문자 때문에 죽지 않게
+        sys.stdout.reconfigure(errors="replace")
+        sys.stderr.reconfigure(errors="replace")
+    check_env()
     for name in ("SIGTERM", "SIGHUP", "SIGINT"):
         if hasattr(signal, name):
             signal.signal(getattr(signal, name), _stop)
@@ -56,16 +77,25 @@ def main():
             pg_started_by_me = True
             wait_port(5432, "PostgreSQL")
         else:
-            sys.exit("PostgreSQL 이 꺼져 있습니다. Windows 는 서비스(services.msc)에서 postgresql 을 시작하세요.")
+            sys.exit(
+                "PostgreSQL 이 꺼져 있습니다 (5432 번 포트).\n"
+                "  Windows: 시작 메뉴에서 '서비스'(services.msc) → 'postgresql-x64-16' 을 찾아 [시작].\n"
+                "           설치 직후에는 보통 이미 켜져 있고, 컴퓨터를 켜면 자동으로 켜집니다.\n"
+                "  PostgreSQL 을 아직 설치하지 않았다면 README 의 「Windows」 절 1번부터 하세요."
+            )
 
     try:
-        # 2. 테스트 계정 (이미 있으면 알아서 건너뜀)
+        # 2. DB · 테이블 (없으면 만들고, 있으면 건너뜀)
+        r = subprocess.run([str(VENV_PY), str(DEV / "setup_db.py")], cwd=BACKEND)
+        if r.returncode != 0:
+            sys.exit(1)
+        # 3. 테스트 계정 (이미 있으면 알아서 건너뜀)
         subprocess.run([str(VENV_PY), "-m", "app.db.seed"], cwd=BACKEND, capture_output=True)
-        # 3. 백엔드
+        # 4. 백엔드
         started.append(subprocess.Popen(
             [str(VENV_PY), "-m", "uvicorn", "app.main:app", "--port", "8000"], cwd=BACKEND))
         wait_port(8000, "백엔드")
-        # 4. 확인 화면 (CORS 에 허용된 5173 포트)
+        # 5. 확인 화면 (CORS 에 허용된 5173 포트)
         started.append(subprocess.Popen(
             [sys.executable, "-m", "http.server", "5173", "--directory", str(DEV)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
