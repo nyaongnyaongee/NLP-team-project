@@ -88,3 +88,12 @@ def auth(client):
         assert r.status_code == 200
         return {"Authorization": "Bearer " + r.json()["token"]}
     return _login
+
+
+@pytest.fixture(autouse=True)
+def no_background_refine(monkeypatch):
+    """학부모 메시지를 보내도 진짜 Claude 를 부르지 않게 정제를 꺼 둔다 (.env 에 키가 있어도 돈이 안 나가게).
+    정제를 시험하는 파일만 refine_with 로 가짜 응답을 넣어 켠다."""
+    import app.routers.messages as messages_router
+
+    monkeypatch.setattr(messages_router, "_refine_in_background", lambda *a, **k: None)

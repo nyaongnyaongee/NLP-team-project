@@ -24,5 +24,6 @@ class MessageOut(BaseModel):
     sender_id: int
     raw_text: str
     refined_text: str | None
+    analysis: dict | None = None  # 정제 결과(주제 · 요청 · 위협 …). 실패하면 {"error": 사유}
     status: str
     created_at: datetime

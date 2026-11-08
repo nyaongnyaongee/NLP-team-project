@@ -1,0 +1,137 @@
+"""send_message 에 붙은 정제 — 가짜 Claude 응답으로 (키 없이, 진짜 API 안 부름)"""
+import json
+
+import pytest
+
+from app.ai import refine as refine_module
+from app.ai.client import ClaudeReply
+from app.routers import messages as router_mod
+
+pytestmark = pytest.mark.usefixtures("clean_messages")
+
+# autouse 로 꺼지기 전의 진짜 백그라운드 함수 (파일을 불러올 때 잡아 둠)
+REAL_BACKGROUND = router_mod._refine_in_background
+
+RAW = "지민이 물통을 누가 또 숨겼대요. 담임 김민지 선생님 무능하네요. 내일까지 새로 사 주세요."
+
+
+def reply(parsed=None, *, text=None, stop="end_turn"):
+    return ClaudeReply(text=text if text is not None else json.dumps(parsed, ensure_ascii=False),
+                       stop_reason=stop, model="fake", usage={"input": 1, "output": 1})
+
+
+def good(masked: str) -> dict:
+    first = masked.split(".")[0] + "."
+    return {
+        "abusive": True,
+        "quotes": ["담임 " + masked.split("담임 ")[1].split(".")[0] + "."],
+        "topic": "친구 관계 · 학교폭력",
+        "requests": [{"type": "배상", "text": "새 물통을 사 달라"}],
+        "threats": [],
+        "deadline": "내일까지",
+        "refined": first + " 같은 일이 되풀이되어 걱정됩니다.",
+    }
+
+
+@pytest.fixture
+def refine_with(monkeypatch):
+    """refine_with(builder): 학부모 메시지 정제를 켜고, Claude 대신 builder(masked)->ClaudeReply 를 쓴다.
+    builder 가 받은 가린 글은 seen 리스트에 쌓인다."""
+    seen: list[str] = []
+
+    def use(builder):
+        def call(masked):
+            seen.append(masked)
+            return builder(masked)
+
+        real = refine_module.refine_message
+        monkeypatch.setattr(router_mod, "_refine_in_background", REAL_BACKGROUND)
+        monkeypatch.setattr(router_mod, "refine_message", lambda raw, roster, adults: real(raw, roster, adults, call=call))
+        return seen
+
+    return use
+
+
+def send(client, auth, who, conv, text):
+    return client.post(f"/conversations/{conv}/messages", json={"text": text}, headers=auth(who))
+
+
+def read(client, auth, who, conv):
+    return client.get(f"/conversations/{conv}/messages", headers=auth(who)).json()
+
+
+def test_학부모가_보내면_응답은_pending_이고_곧_정제문이_저장된다(client, auth, ids, refine_with):
+    seen = refine_with(lambda m: reply(good(m)))
+    r = send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    assert r.status_code == 201 and r.json()["status"] == "pending"  # 응답은 정제를 기다리지 않는다
+
+    msg = read(client, auth, "teacher1", ids["conv_parent1"])[0]  # 교사가 조회
+    assert msg["status"] == "done"
+    assert msg["raw_text"] == RAW  # 원문은 그대로
+    assert msg["refined_text"].startswith("지민이 물통을")  # 정제문은 원래 이름으로 복원
+    assert msg["analysis"]["topic"] == "친구 관계 · 학교폭력"
+    assert msg["analysis"]["quotes"] == ["담임 김민지 선생님 무능하네요."]
+    assert msg["analysis"]["deadline"] == "내일까지"
+    # Claude 에게는 진짜 이름이 가려져서 갔다 (학생은 시연 명단, 교사는 어른 명단)
+    assert len(seen) == 1 and "지민" not in seen[0] and "김민지" not in seen[0]
+
+
+def test_거절되면_failed_와_사유가_저장된다(client, auth, ids, refine_with):
+    refine_with(lambda m: reply(text="", stop="refusal"))
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    msg = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert msg["status"] == "failed" and msg["refined_text"] is None
+    assert "거절" in msg["analysis"]["error"]
+    assert msg["raw_text"] == RAW  # 실패해도 원문은 남아 교사가 읽을 수 있다
+    assert "지민" not in msg["analysis"]["error"]  # 사유에 원문이 들어가지 않는다
+
+
+def test_Claude_호출이_예외로_끝나도_pending_으로_멈추지_않는다(client, auth, ids, refine_with):
+    def boom(m):
+        raise RuntimeError("뜻밖의 오류")
+
+    refine_with(boom)
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    msg = read(client, auth, "parent1", ids["conv_parent1"])[0]
+    assert msg["status"] == "failed" and "RuntimeError" in msg["analysis"]["error"]
+
+
+def test_교사_메시지는_정제하지_않는다(client, auth, ids, refine_with):
+    seen = refine_with(lambda m: reply(good(m)))
+    r = send(client, auth, "teacher1", ids["conv_parent1"], "확인해 보겠습니다")
+    assert r.json()["status"] == "skip"
+    assert seen == []
+    assert read(client, auth, "parent1", ids["conv_parent1"])[0]["refined_text"] is None
+
+
+def test_다시_정제하면_실패했던_메시지가_done_이_된다(client, auth, ids, refine_with):
+    state = {"ok": False}
+    refine_with(lambda m: reply(good(m)) if state["ok"] else reply(text="", stop="refusal"))
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    first = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert first["status"] == "failed"
+
+    state["ok"] = True
+    r = client.post(f"/conversations/{ids['conv_parent1']}/messages/{first['id']}/refine", headers=auth("teacher1"))
+    assert r.status_code == 202 and r.json()["status"] == "pending" and r.json()["analysis"] is None
+    again = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert again["status"] == "done" and again["refined_text"].startswith("지민이")
+
+
+def test_다시_정제는_해당_교사만_할_수_있다(client, auth, ids, refine_with):
+    refine_with(lambda m: reply(text="", stop="refusal"))
+    mid = send(client, auth, "parent1", ids["conv_parent1"], RAW).json()["id"]
+    url = f"/conversations/{ids['conv_parent1']}/messages/{mid}/refine"
+    assert client.post(url, headers=auth("parent1")).status_code == 403  # 학부모 본인도 안 됨
+    assert client.post(url, headers=auth("parent2")).status_code == 404  # 남의 대화
+    assert client.post(url).status_code == 401  # 로그인 없음
+
+
+def test_다시_정제는_학부모_메시지에만(client, auth, ids, refine_with):
+    refine_with(lambda m: reply(good(m)))
+    mid = send(client, auth, "teacher1", ids["conv_parent1"], "확인해 보겠습니다").json()["id"]  # skip
+    assert client.post(f"/conversations/{ids['conv_parent1']}/messages/{mid}/refine", headers=auth("teacher1")).status_code == 404
+    assert client.post(f"/conversations/{ids['conv_parent1']}/messages/99999/refine", headers=auth("teacher1")).status_code == 404
+    # 다른 대화의 메시지 번호로는 안 된다
+    other = send(client, auth, "parent2", ids["conv_parent2"], RAW).json()["id"]
+    assert client.post(f"/conversations/{ids['conv_parent1']}/messages/{other}/refine", headers=auth("teacher1")).status_code == 404
