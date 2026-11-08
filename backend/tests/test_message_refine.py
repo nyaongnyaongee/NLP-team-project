@@ -45,6 +45,7 @@ def refine_with(monkeypatch):
             return builder(masked)
 
         real = refine_module.refine_message
+        monkeypatch.setitem(router_mod._refine_state, "enabled", True)  # 다른 시험이 끈 채로 남겨도 켠 상태에서 시작
         monkeypatch.setattr(router_mod, "_refine_in_background", REAL_BACKGROUND)
         monkeypatch.setattr(router_mod, "refine_message", lambda raw, roster, adults: real(raw, roster, adults, call=call))
         return seen
@@ -173,3 +174,42 @@ def test_교사가_보낸_글은_양쪽_모두_그대로_보인다(client, auth,
     send(client, auth, "teacher1", conv, "확인해 보겠습니다")
     for who in ("teacher1", "parent1"):
         assert read(client, auth, who, conv)[0]["raw_text"] == "확인해 보겠습니다"
+
+
+# ---------------------------------------------------------------- 시험용 스위치 (정제 켜고 끄기)
+
+@pytest.fixture
+def dev_tools(monkeypatch):
+    monkeypatch.setattr(router_mod.settings, "dev_tools", True)
+
+
+def test_스위치_API_는_개발_모드가_아니면_없는_것처럼_404(client):
+    assert client.get("/dev/refine").status_code == 404
+    assert client.post("/dev/refine", json={"enabled": False}).status_code == 404
+
+
+def test_스위치로_켜고_끌_수_있다(client, dev_tools, monkeypatch):
+    monkeypatch.setitem(router_mod._refine_state, "enabled", True)
+    assert client.get("/dev/refine").json() == {"enabled": True}
+    assert client.post("/dev/refine", json={"enabled": False}).json() == {"enabled": False}
+    assert client.get("/dev/refine").json() == {"enabled": False}
+    assert client.post("/dev/refine", json={"enabled": True}).json() == {"enabled": True}
+
+
+def test_꺼져_있으면_Claude_를_부르지_않고_켠_뒤_다시_정제하면_된다(client, auth, ids, dev_tools, refine_with):
+    seen = refine_with(lambda m: reply(good(m)))
+    conv = ids["conv_parent1"]
+    client.post("/dev/refine", json={"enabled": False})
+
+    send(client, auth, "parent1", conv, RAW)
+    msg = read(client, auth, "teacher1", conv)[0]
+    assert msg["status"] == "failed" and "꺼져" in msg["analysis"]["error"]
+    assert msg["raw_text"] is None  # 꺼져 있어도 교사에게 원문은 안 간다
+    assert seen == []  # Claude 를 부르지 않았다 (API 비용 없음)
+
+    client.post("/dev/refine", json={"enabled": True})
+    r = client.post(f"/conversations/{conv}/messages/{msg['id']}/refine", headers=auth("teacher1"))
+    assert r.status_code == 202
+    again = read(client, auth, "teacher1", conv)[0]
+    assert again["status"] == "done" and again["refined_text"].startswith("지민이")
+    assert len(seen) == 1  # 켠 뒤에만 한 번 불렀다

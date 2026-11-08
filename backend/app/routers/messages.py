@@ -2,17 +2,21 @@
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.ai.refine import refine_message
 from app.ai.roster import load_sample_roster
 from app.core.auth import current_user
+from app.core.config import settings
 from app.db import crud
 from app.db.database import SessionLocal, get_db
 from app.schemas.message import MessageIn, MessageOut
 
 log = logging.getLogger("routers.messages")
 router = APIRouter(tags=["messages"])
+
+_refine_state = {"enabled": settings.refine_enabled}  # 시험 화면의 스위치가 바꾼다 (서버를 다시 켜면 설정값으로 돌아감)
 
 
 def _my_conversation(db: Session, conv_id: int, user):
@@ -44,9 +48,13 @@ def _refine_in_background(msg_id: int, raw_text: str) -> None:
     """응답을 보낸 뒤 돌아간다 (요청의 DB 연결은 이미 닫혔으니 직접 연다).
     명단(시연용 고정): 학생 = ai/sample_roster.json 20명, 어른 = 교사 · 학부모 실명(DB users)."""
     try:
-        with SessionLocal() as db:
-            adults = crud.adult_names(db)
-        result = refine_message(raw_text, load_sample_roster(), adults)  # 몇 초 걸리므로 DB 연결을 잡고 있지 않는다
+        if not _refine_state["enabled"]:  # 꺼져 있으면 Claude 를 부르지 않는다. 켠 뒤 「다시 정제」로 정제할 수 있다
+            result = {"status": "failed", "refined_text": None, "analysis": None,
+                      "error": "정제가 꺼져 있습니다 (시험용 스위치). 켠 뒤 「다시 정제」를 누르세요"}
+        else:
+            with SessionLocal() as db:
+                adults = crud.adult_names(db)
+            result = refine_message(raw_text, load_sample_roster(), adults)  # 몇 초 걸리므로 DB 연결을 잡고 있지 않는다
     except Exception as e:  # 명단 조회 등 예기치 못한 오류도 pending 으로 멈추지 않게 실패로 기록
         log.exception("정제 준비 중 오류")
         result = {"status": "failed", "refined_text": None, "analysis": None, "error": f"정제 중 오류 ({type(e).__name__})"}
@@ -96,3 +104,28 @@ def refine_again(conv_id: int, msg_id: int, background: BackgroundTasks,
 def read_messages(conv_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
     _my_conversation(db, conv_id, user)
     return [_view(m, user) for m in crud.list_messages(db, conv_id)]
+
+
+# ---- 시험용 스위치: dev.py 로 켰을 때(DEV_TOOLS=1)만 열린다. 일반 서버에서는 404
+
+class RefineSwitch(BaseModel):
+    enabled: bool
+
+
+def _need_dev_tools():
+    if not settings.dev_tools:
+        raise HTTPException(404, "Not Found")
+
+
+@router.get("/dev/refine")
+def dev_refine_state():
+    _need_dev_tools()
+    return {"enabled": _refine_state["enabled"]}
+
+
+@router.post("/dev/refine")
+def dev_refine_set(body: RefineSwitch):
+    _need_dev_tools()
+    _refine_state["enabled"] = body.enabled
+    log.info("정제 %s", "켬" if body.enabled else "끔")
+    return {"enabled": _refine_state["enabled"]}

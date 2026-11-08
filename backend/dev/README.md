@@ -8,6 +8,8 @@ cd backend
 py dev\dev.py          # Windows      (Mac 은 python3 dev/dev.py)
 ```
 
+**정제(Claude API 호출)는 기본이 꺼짐**이다. 화면 위쪽 스위치로 켜고 끈다 (처음부터 켜려면 `dev.py --refine`). 꺼져 있을 때 보낸 메시지는 「정제하지 못했습니다」로 남고, 스위치를 켠 뒤 교사 칸의 「다시 정제」를 누르면 정제된다.
+
 처음이면 루트 `README.md` 의 「실행」 절대로 PostgreSQL · `.venv` · `.env` 를 먼저 준비한다.
 DB · 테이블 · 테스트 계정은 `dev.py` 가 알아서 만들고, PostgreSQL · 백엔드(8000) · 이 화면(5173) 을 켠 뒤 브라우저를 연다.
 끄기는 `Ctrl+C` (Mac 에서 `dev.py` 가 PostgreSQL 을 켰다면 같이 꺼진다). 열면 학부모 · 교사 칸이 이미 로그인돼 있다.
