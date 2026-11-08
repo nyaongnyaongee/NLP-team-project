@@ -19,7 +19,7 @@ with SessionLocal() as db:
             text("INSERT INTO users (role, name, login_id, password_hash) VALUES (:r,:n,:l,:p) RETURNING id"),
             {"r": role, "n": name, "l": login, "p": hash_password("test1234")},
         ).scalar()
-    for parent, student in (("parent1", "박지후"), ("parent2", "이하준")):
+    for parent, student in (("parent1", "지민"), ("parent2", "민준"))  # 학생 이름은 ai/sample_roster.json 의 20명 중에서:
         db.execute(
             text("INSERT INTO conversations (teacher_id, parent_id, student_name) VALUES (:t,:p,:s)"),
             {"t": ids["teacher1"], "p": ids[parent], "s": student},

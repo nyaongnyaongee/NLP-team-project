@@ -1,8 +1,11 @@
-"""개발용 확인 화면을 한 번에 켠다.   실행: cd backend && python3 dev/dev.py   (끄기: Ctrl+C)
+"""개발용 확인 화면을 한 번에 켠다.   실행: cd backend && python3 dev/dev.py [--refine]   (끄기: Ctrl+C)
+
+정제(Claude API 호출)는 기본이 꺼짐이다. 화면 위쪽 스위치로 켜거나, --refine 을 붙이면 켠 채로 시작한다.
 
 PostgreSQL → DB · 테이블 · 테스트 계정 → 백엔드(8000) → 확인 화면(5173) → 브라우저 순서로 켜고,
 Ctrl+C 로 끄면 이 스크립트가 켠 것만 같이 끈다.  venv 를 따로 켜지 않아도 된다.
 """
+import os
 import shutil
 import signal
 import socket
@@ -92,8 +95,10 @@ def main():
         # 3. 테스트 계정 (이미 있으면 알아서 건너뜀)
         subprocess.run([str(VENV_PY), "-m", "app.db.seed"], cwd=BACKEND, capture_output=True)
         # 4. 백엔드
+        refine_on = "--refine" in sys.argv  # 기본은 정제 꺼짐 (돈이 실수로 안 나가게). 화면의 스위치로 켠다
+        env = {**os.environ, "DEV_TOOLS": "1", "REFINE_ENABLED": "1" if refine_on else "0"}
         started.append(subprocess.Popen(
-            [str(VENV_PY), "-m", "uvicorn", "app.main:app", "--port", "8000"], cwd=BACKEND))
+            [str(VENV_PY), "-m", "uvicorn", "app.main:app", "--port", "8000"], cwd=BACKEND, env=env))
         wait_port(8000, "백엔드")
         # 5. 확인 화면 (CORS 에 허용된 5173 포트)
         started.append(subprocess.Popen(
@@ -102,7 +107,8 @@ def main():
         wait_port(5173, "확인 화면")
 
         url = "http://localhost:5173/"
-        print(f"\n켜졌습니다 → {url}   (끄기: Ctrl+C)\n")
+        print(f"\n켜졌습니다 → {url}   (끄기: Ctrl+C)")
+        print(f"정제(Claude API): {'켜짐' if refine_on else '꺼짐 — 화면 위쪽 스위치로 켜세요'}\n")
         if "--no-open" not in sys.argv:
             webbrowser.open(url)
         while all(p.poll() is None for p in started):
