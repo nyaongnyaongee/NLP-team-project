@@ -64,9 +64,9 @@ def ids(engine):
     return out
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def clean_messages(engine, ids):
-    yield
+    yield  # DB 를 쓰는 테스트 파일이 pytestmark 로 골라 쓴다 (AI 시험은 DB 없이 돌아가야 함)
     with engine.begin() as c:  # 테스트마다 메시지만 비운다
         c.execute(text("TRUNCATE messages RESTART IDENTITY"))
 

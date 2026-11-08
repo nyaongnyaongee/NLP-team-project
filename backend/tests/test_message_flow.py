@@ -1,5 +1,8 @@
 """메시지 보내기 → DB 저장 → 다른 계정에서 조회"""
+import pytest
 from sqlalchemy import text
+
+pytestmark = pytest.mark.usefixtures("clean_messages")  # 테스트마다 메시지 비우기
 
 
 def test_로그인_성공과_실패(client):
