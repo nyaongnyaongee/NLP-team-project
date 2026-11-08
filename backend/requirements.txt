@@ -5,3 +5,4 @@ psycopg[binary]
 pydantic-settings
 anthropic
 kiwipiepy==0.24.1
+python-multipart

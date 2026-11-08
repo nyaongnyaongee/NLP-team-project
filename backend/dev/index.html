@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이음 시험 화면</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --text:#1c1f24; --mute:#6b7280; --line:#e2e5ea;
+          --me:#dbeafe; --other:#f1f3f5; --accent:#2563eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161a; --card:#1d2025; --text:#e8eaed; --mute:#9aa0a6; --line:#2e3238;
+            --me:#1e3a5f; --other:#2a2e34; --accent:#60a5fa; } }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--text);
+         font:15px/1.5 -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:var(--mute); margin:0 0 16px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px;
+           padding:14px; display:flex; flex-direction:column; min-height:520px; }
+  .panel h2 { font-size:15px; margin:0 0 10px; }
+  .row { display:flex; gap:8px; margin-bottom:8px; }
+  input, select, button { font:inherit; padding:8px 10px; border-radius:8px;
+         border:1px solid var(--line); background:var(--bg); color:var(--text); }
+  input { flex:1; min-width:0; }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
+  .who { font-size:13px; color:var(--mute); margin-bottom:8px; }
+  .msgs { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;
+          padding:8px 0; max-height:380px; }
+  .m { max-width:80%; padding:8px 12px; border-radius:12px; background:var(--other); }
+  .m.me { align-self:flex-end; background:var(--me); }
+  .meta { font-size:11px; color:var(--mute); margin-top:2px; }
+  .empty { color:var(--mute); text-align:center; margin-top:40px; }
+  .err { color:#dc2626; font-size:13px; min-height:18px; }
+</style>
+</head>
+<body>
+<h1>이음 시험 화면</h1>
+<p class="sub">왼쪽(학부모)에서 보내면 오른쪽(교사)에 2초 안에 나타납니다. 비밀번호는 모두 test1234.</p>
+<div class="grid" id="grid"></div>
+
+<script>
+const API = "http://localhost:8000";
+
+function panel(title, defaultLogin) {
+  const el = document.createElement("div");
+  el.className = "panel";
+  el.innerHTML = `
+    <h2>${title}</h2>
+    <div class="row">
+      <select class="login">
+        <option value="parent1">parent1 (박서연)</option>
+        <option value="parent2">parent2 (이도윤)</option>
+        <option value="teacher1">teacher1 (김민지 교사)</option>
+      </select>
+      <button class="go">로그인</button>
+    </div>
+    <div class="err"></div>
+    <div class="who"></div>
+    <div class="msgs"><div class="empty">로그인하면 대화가 보입니다</div></div>
+    <div class="row">
+      <input class="text" placeholder="메시지 입력 후 Enter" disabled>
+      <button class="send" disabled>보내기</button>
+    </div>`;
+  const q = s => el.querySelector(s);
+  q(".login").value = defaultLogin;
+  let token = null, me = null, convId = null, timer = null;
+
+  async function api(path, opt = {}) {
+    const r = await fetch(API + path, { ...opt, headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: "Bearer " + token } : {}) } });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    return r.json();
+  }
+
+  async function refresh() {
+    if (!convId) return;
+    try {
+      const list = await api(`/conversations/${convId}/messages`);
+      const box = q(".msgs");
+      const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+      box.innerHTML = list.length ? "" : '<div class="empty">아직 메시지가 없습니다</div>';
+      for (const m of list) {
+        const d = document.createElement("div");
+        d.className = "m" + (m.sender_id === me.id ? " me" : "");
+        d.textContent = m.raw_text;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `상태: ${m.status} · ${new Date(m.created_at).toLocaleTimeString("ko-KR")}`;
+        d.appendChild(meta);
+        box.appendChild(d);
+      }
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    } catch (e) { q(".err").textContent = e.message; }
+  }
+
+  q(".go").onclick = async () => {
+    q(".err").textContent = "";
+    try {
+      const res = await api("/auth/login", { method: "POST", body: JSON.stringify(
+        { login_id: q(".login").value, password: "test1234" }) });
+      token = res.token;
+      me = { name: res.name, role: res.role };
+      const convs = await api("/conversations");
+      convId = convs[0].id;
+      // 내 id 는 첫 대화의 teacher_id/parent_id 로 알아냄
+      me.id = res.role === "teacher" ? convs[0].teacher_id : convs[0].parent_id;
+      q(".who").textContent = `${res.name} (${res.role}) · 대화 #${convId} · 학생 ${convs[0].student_name}`;
+      q(".text").disabled = q(".send").disabled = false;
+      clearInterval(timer);
+      refresh();
+      timer = setInterval(refresh, 2000);
+    } catch (e) { q(".err").textContent = e.message; }
+  };
+
+  async function send() {
+    const t = q(".text").value.trim();
+    if (!t) return;
+    q(".text").value = "";
+    try {
+      await api(`/conversations/${convId}/messages`, { method: "POST", body: JSON.stringify({ text: t }) });
+      refresh();
+    } catch (e) { q(".err").textContent = e.message; }
+  }
+  q(".send").onclick = send;
+  q(".text").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) send(); });
+  return el;
+}
+
+const grid = document.getElementById("grid");
+grid.append(panel("학부모 화면", "parent1"), panel("교사 화면", "teacher1"));
+</script>
+</body>
+</html>
