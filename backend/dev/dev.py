@@ -41,12 +41,17 @@ def check_env():
     env = BACKEND / ".env"
     if not env.exists():
         sys.exit("backend/.env 가 없습니다. 먼저 만드세요:  copy .env.example .env  (Mac: cp)  그리고 열어서 값을 채우세요.")
-    text = env.read_text(encoding="utf-8")
-    if "Mac사용자이름" in text or "비밀번호@" in text:
-        sys.exit("backend/.env 의 DATABASE_URL 이 예시 그대로입니다. 본인 값으로 바꾸세요 (.env.example 위쪽 안내 참고).")
-    for line in text.splitlines():
-        if line.startswith("JWT_SECRET=") and not line.split("=", 1)[1].strip():
-            sys.exit("backend/.env 의 JWT_SECRET 이 비어 있습니다. 아무 긴 문자열을 넣으세요 (.env.example 안내 참고).")
+    values = {}
+    for line in env.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:  # 주석 줄은 무시
+            k, v = line.split("=", 1)
+            values[k.strip()] = v.strip()
+    db = values.get("DATABASE_URL", "")
+    if not db or "Mac사용자이름" in db or "비밀번호@" in db:
+        sys.exit("backend/.env 의 DATABASE_URL 이 비어 있거나 예시 그대로입니다. 본인 값으로 바꾸세요 (.env.example 위쪽 안내 참고).")
+    if not values.get("JWT_SECRET"):
+        sys.exit("backend/.env 의 JWT_SECRET 이 비어 있습니다. 아무 긴 문자열을 넣으세요 (.env.example 안내 참고).")
 
 
 def main():
