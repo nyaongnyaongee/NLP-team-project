@@ -1,0 +1,20 @@
+# 비밀 값
+.env
+
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 프론트
+node_modules/
+dist/
+
+# 가명처리 매핑 등 개인정보가 담길 수 있는 파일
+*.pkl
+
+# 기타
+.DS_Store
+.vscode/
+.idea/
