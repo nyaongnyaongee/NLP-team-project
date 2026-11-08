@@ -72,17 +72,7 @@ def save_refine_result(db: Session, msg_id: int, result: dict) -> None:
     db.commit()
 
 
-def class_people(db: Session, teacher_id: int) -> tuple[list[str], list[str]]:
-    """가명처리 명단용: 이 교사의 대화에 나오는 학생 이름들, 어른(교사 · 학부모) 실명들.
-    DB 에 「반」이 없어서 지금은 교사 한 명의 대화 전체를 한 반으로 본다."""
-    rows = db.execute(
-        text(
-            "SELECT c.student_name, t.name AS teacher_name, p.name AS parent_name "
-            "FROM conversations c JOIN users t ON t.id = c.teacher_id JOIN users p ON p.id = c.parent_id "
-            "WHERE c.teacher_id = :t"
-        ),
-        {"t": teacher_id},
-    ).mappings().all()
-    students = sorted({r["student_name"] for r in rows})
-    adults = sorted({r["teacher_name"] for r in rows} | {r["parent_name"] for r in rows})
-    return students, adults
+def adult_names(db: Session) -> list[str]:
+    """가명처리 명단용 어른 실명 (교사 · 학부모, 성까지).  학생 명단은 DB 가 아니라 ai/sample_roster.json 으로 고정."""
+    rows = db.execute(text("SELECT name FROM users WHERE role IN ('teacher', 'parent')")).mappings().all()
+    return sorted({r["name"] for r in rows})
