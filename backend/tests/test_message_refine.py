@@ -67,10 +67,10 @@ def test_학부모가_보내면_응답은_pending_이고_곧_정제문이_저장
 
     msg = read(client, auth, "teacher1", ids["conv_parent1"])[0]  # 교사가 조회
     assert msg["status"] == "done"
-    assert msg["raw_text"] == RAW  # 원문은 그대로
+    assert msg["raw_text"] is None  # 원문은 교사에게 안 간다
     assert msg["refined_text"].startswith("지민이 물통을")  # 정제문은 원래 이름으로 복원
     assert msg["analysis"]["topic"] == "친구 관계 · 학교폭력"
-    assert msg["analysis"]["quotes"] == ["담임 김민지 선생님 무능하네요."]
+    assert "quotes" not in msg["analysis"]  # 원문 인용(욕설 문장)도 교사에게 안 간다
     assert msg["analysis"]["deadline"] == "내일까지"
     # Claude 에게는 진짜 이름이 가려져서 갔다 (학생은 시연 명단, 교사는 어른 명단)
     assert len(seen) == 1 and "지민" not in seen[0] and "김민지" not in seen[0]
@@ -82,7 +82,7 @@ def test_거절되면_failed_와_사유가_저장된다(client, auth, ids, refin
     msg = read(client, auth, "teacher1", ids["conv_parent1"])[0]
     assert msg["status"] == "failed" and msg["refined_text"] is None
     assert "거절" in msg["analysis"]["error"]
-    assert msg["raw_text"] == RAW  # 실패해도 원문은 남아 교사가 읽을 수 있다
+    assert msg["raw_text"] is None  # 실패해도 원문은 교사에게 안 간다 (DB 에는 있다)
     assert "지민" not in msg["analysis"]["error"]  # 사유에 원문이 들어가지 않는다
 
 
@@ -92,7 +92,7 @@ def test_Claude_호출이_예외로_끝나도_pending_으로_멈추지_않는다
 
     refine_with(boom)
     send(client, auth, "parent1", ids["conv_parent1"], RAW)
-    msg = read(client, auth, "parent1", ids["conv_parent1"])[0]
+    msg = read(client, auth, "teacher1", ids["conv_parent1"])[0]
     assert msg["status"] == "failed" and "RuntimeError" in msg["analysis"]["error"]
 
 
@@ -135,3 +135,41 @@ def test_다시_정제는_학부모_메시지에만(client, auth, ids, refine_wi
     # 다른 대화의 메시지 번호로는 안 된다
     other = send(client, auth, "parent2", ids["conv_parent2"], RAW).json()["id"]
     assert client.post(f"/conversations/{ids['conv_parent1']}/messages/{other}/refine", headers=auth("teacher1")).status_code == 404
+
+
+# ---------------------------------------------------------------- 원문은 DB 에만: 누가 무엇을 보나
+
+def test_교사가_받는_어떤_응답에도_원문이_없다(client, auth, ids, engine, refine_with):
+    refine_with(lambda m: reply(good(m)))
+    conv = ids["conv_parent1"]
+    sent = send(client, auth, "parent1", conv, RAW).json()
+    teacher_sees = [
+        json.dumps(read(client, auth, "teacher1", conv), ensure_ascii=False),
+        client.post(f"/conversations/{conv}/messages/{sent['id']}/refine", headers=auth("teacher1")).text,  # 다시 정제 응답
+        json.dumps(read(client, auth, "teacher1", conv), ensure_ascii=False),
+    ]
+    for body in teacher_sees:
+        assert RAW not in body
+        assert "무능하네요" not in body  # 인용문(quotes)에 있던 문장
+    with engine.connect() as c:  # 그래도 DB 에는 원문이 있다 (법적 확인용)
+        from sqlalchemy import text as sql
+        assert c.execute(sql("SELECT raw_text FROM messages WHERE id = :i"), {"i": sent["id"]}).scalar() == RAW
+
+
+def test_학부모는_자기_원문만_보고_정제_결과는_못_본다(client, auth, ids, refine_with):
+    refine_with(lambda m: reply(good(m)))
+    conv = ids["conv_parent1"]
+    posted = send(client, auth, "parent1", conv, RAW).json()
+    assert posted["raw_text"] == RAW and posted["refined_text"] is None and posted["analysis"] is None
+    msg = read(client, auth, "parent1", conv)[0]
+    assert msg["raw_text"] == RAW
+    assert msg["refined_text"] is None and msg["analysis"] is None  # 욕설로 분류됐는지 등은 학부모에게 안 보인다
+    assert msg["status"] == "done"
+
+
+def test_교사가_보낸_글은_양쪽_모두_그대로_보인다(client, auth, ids, refine_with):
+    refine_with(lambda m: reply(good(m)))
+    conv = ids["conv_parent1"]
+    send(client, auth, "teacher1", conv, "확인해 보겠습니다")
+    for who in ("teacher1", "parent1"):
+        assert read(client, auth, who, conv)[0]["raw_text"] == "확인해 보겠습니다"

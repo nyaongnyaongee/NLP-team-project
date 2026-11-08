@@ -30,12 +30,17 @@ def test_교사_메시지는_skip_으로_저장된다(client, auth, ids):
     assert r.status_code == 201 and r.json()["status"] == "skip"
 
 
-def test_교사가_학부모_메시지를_본다(client, auth, ids):
+def test_교사는_학부모_메시지가_온_것을_보지만_원문은_못_본다(client, auth, ids, engine):
     conv = ids["conv_parent1"]
     client.post(f"/conversations/{conv}/messages", json={"text": "첫째"}, headers=auth("parent1"))
     client.post(f"/conversations/{conv}/messages", json={"text": "둘째"}, headers=auth("parent1"))
-    r = client.get(f"/conversations/{conv}/messages", headers=auth("teacher1"))
-    assert [m["raw_text"] for m in r.json()] == ["첫째", "둘째"]  # 보낸 순서대로
+    msgs = client.get(f"/conversations/{conv}/messages", headers=auth("teacher1")).json()
+    assert len(msgs) == 2 and msgs[0]["id"] < msgs[1]["id"]  # 보낸 순서대로
+    assert all(m["raw_text"] is None for m in msgs)  # 원문은 교사에게 안 간다 (정제 전이라 정제문도 아직 없음)
+    with engine.connect() as c:  # 원문은 DB 에 그대로 있다
+        assert [r[0] for r in c.execute(text("SELECT raw_text FROM messages ORDER BY id"))] == ["첫째", "둘째"]
+    mine = client.get(f"/conversations/{conv}/messages", headers=auth("parent1")).json()
+    assert [m["raw_text"] for m in mine] == ["첫째", "둘째"]  # 학부모는 자기가 쓴 글을 본다
 
 
 def test_학부모는_다른_학부모_대화를_못_본다(client, auth, ids):
