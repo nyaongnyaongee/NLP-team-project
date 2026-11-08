@@ -89,6 +89,11 @@ TYPO_AFTER = re.compile(rf"(?:이(?:[가는를랑도만의네]|한테|에게|하
 TYPO_STOP = {"손주", "손녀", "집안", "시누", "남편", "아들", "아내", "가족", "부모", "식구", "동생", "사람", "이름", "시간", "나이"}
 TYPO_BEFORE = re.compile(rf"(?:^|[^가-힣])(?:우리|저희|울|{'|'.join(REL)})\s?[{''.join(sorted(SURNAMES))}]?$")
 FULL_FOLLOW = re.compile(rf"(?:{FOLLOW.pattern}|고(?![가-힣])|인데|이라|라고)")  # 저는 오영미고 · 변상우인데요 …
+# 명단(학생 · 어른)에 있는 이름은 에 · 에서 · 으로 · 로 · 에 대한 … 앞에서도 이름으로 본다 (준서에 대한 · 지민으로 · 소율로).
+# Kiwi 가 찾은 일반 후보에는 쓰지 않는다: 수원에서 · 서울로 같은 지명이 이름으로 가려지지 않게. 에 · 로 바로 뒤에 낱말이 이어지면(지우로봇) 뺀다
+_LISTED_EXTRA = r"|에(?:서|도|는|만|까지|\s|[,.!?]|$)|으?로(?:서|써|부터|는|도|만|\s|[,.!?]|$)"
+FOLLOW_LISTED = re.compile(rf"(?:{FOLLOW.pattern}{_LISTED_EXTRA})")
+FULL_FOLLOW_LISTED = re.compile(rf"(?:{FULL_FOLLOW.pattern}{_LISTED_EXTRA})")
 FULL_STOP = {"어머니", "아버지", "할머니", "고모부", "이모부", "선생들", "교장실", "교무실", "행정실", "보건실", "연락처",
              "유치원", "방과후", "원어민", "기간제", "도우미", "어린이", "도시락", "전화번", "문자로"}
 
@@ -211,6 +216,7 @@ class PiiMasker:
         adults: 교직원 · 학부모 실명(성 + 이름). 성까지 붙은 모양(띄어 쓴 것 포함)만 가린다."""
         self.roster = {self._stem(n) for n in (roster or []) if n}
         self.adults = sorted({a.replace(" ", "") for a in (adults or []) if len(a.replace(" ", "")) >= 3}, key=len, reverse=True)
+        self._adult_set = set(self.adults)
         self.rng = random.Random(seed)
         self.kiwi = Kiwi()
         self.kiwi_plain = Kiwi()  # 명단을 넣지 않은 것: 실명 판정(_full_ok)용
@@ -320,9 +326,10 @@ class PiiMasker:
         for f in fulls:
             for m in re.finditer(rf"(?<![가-힣]){re.escape(f)}", text):
                 s, e = m.span()
-                if not FULL_FOLLOW.match(text, e) or any(taken[s:e]):
-                    continue
                 c = f.replace(" ", "")
+                follow = FULL_FOLLOW_LISTED if c in self._adult_set else FULL_FOLLOW
+                if not follow.match(text, e) or any(taken[s:e]):
+                    continue
                 spans.append(Span(s, e, "NAME", f, key=c[1:], surname=c[0], source="full"))
                 taken[s:e] = [True] * (e - s)
         return spans
@@ -431,7 +438,8 @@ class PiiMasker:
             for m in pat.finditer(text):
                 s, e = m.span()
                 surname = m.group(1) or ""
-                if not FOLLOW.match(text, e):
+                follow = FOLLOW_LISTED if names[name] == "roster" else FOLLOW
+                if not follow.match(text, e):
                     continue  # 지우개 · 하준비 …
                 if any(taken[s:e]):
                     continue
