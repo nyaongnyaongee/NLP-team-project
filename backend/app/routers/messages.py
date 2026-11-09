@@ -11,6 +11,7 @@ from app.core.auth import current_user
 from app.core.config import settings
 from app.db import crud
 from app.db.database import SessionLocal, get_db
+from app.routers.ws import hub
 from app.schemas.message import MessageIn, MessageOut
 
 log = logging.getLogger("routers.messages")
@@ -44,7 +45,7 @@ def _view(msg, user) -> dict:
     return d
 
 
-def _refine_in_background(msg_id: int, raw_text: str) -> None:
+def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
     """응답을 보낸 뒤 돌아간다 (요청의 DB 연결은 이미 닫혔으니 직접 연다).
     명단(시연용 고정): 학생 = ai/sample_roster.json 20명, 어른 = 교사 · 학부모 실명(DB users)."""
     try:
@@ -63,6 +64,12 @@ def _refine_in_background(msg_id: int, raw_text: str) -> None:
             crud.save_refine_result(db, msg_id, result)
     except Exception:
         log.exception("정제 결과 저장 실패 (message %s)", msg_id)
+        return
+    hub.notify_conversation(conv_id)  # 교사 화면: 정제문(또는 실패 사유)이 뜨고 띵
+    if result["status"] == "done":  # 교사가 정제문을 먼저 보고, 몇 초 뒤 답장 추천이 붙는다
+        from app.routers import drafts  # drafts 가 이 파일을 불러서, 여기서는 늦게 부른다
+
+        drafts.auto_draft(msg_id, conv_id)
 
 
 @router.get("/conversations")
@@ -77,8 +84,9 @@ def send_message(conv_id: int, body: MessageIn, background: BackgroundTasks,
     # 학부모 메시지는 정제 대기(pending) → 백그라운드에서 정제, 교사 메시지는 그대로(skip)
     status = "pending" if user["role"] == "parent" else "skip"
     msg = crud.add_message(db, conv_id, user["id"], body.text, status)
+    hub.notify_conversation(conv_id)
     if status == "pending":
-        background.add_task(_refine_in_background, msg["id"], body.text)
+        background.add_task(_refine_in_background, msg["id"], body.text, conv_id)
     return _view(msg, user)
 
 
@@ -96,7 +104,8 @@ def refine_again(conv_id: int, msg_id: int, background: BackgroundTasks,
         return _view(msg, user)  # 이미 정제 중
     raw_text = msg["raw_text"]
     msg = crud.set_message_pending(db, msg_id)
-    background.add_task(_refine_in_background, msg_id, raw_text)
+    hub.notify_conversation(conv_id)
+    background.add_task(_refine_in_background, msg_id, raw_text, conv_id)
     return _view(msg, user)
 
 

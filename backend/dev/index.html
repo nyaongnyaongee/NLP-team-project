@@ -23,12 +23,16 @@
   .row { display:flex; gap:8px; margin-bottom:8px; }
   input, select, button { font:inherit; padding:8px 10px; border-radius:8px;
          border:1px solid var(--line); background:var(--bg); color:var(--text); }
-  input { flex:1; min-width:0; }
+  input, textarea { flex:1; min-width:0; }
+  textarea { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--line);
+             background:var(--bg); color:var(--text); resize:vertical; }
   button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
   .who { font-size:13px; color:var(--mute); margin-bottom:8px; }
+  .live { font-size:11px; margin-left:6px; }
+  .live.on { color:#16a34a; } .live.off { color:#b45309; }
   .msgs { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;
           padding:8px 0; max-height:380px; }
-  .m { max-width:80%; padding:8px 12px; border-radius:12px; background:var(--other); }
+  .m { white-space:pre-wrap; max-width:80%; padding:8px 12px; border-radius:12px; background:var(--other); }
   .m.me { align-self:flex-end; background:var(--me); }
   .meta { font-size:11px; color:var(--mute); margin-top:2px; }
   .empty { color:var(--mute); text-align:center; margin-top:40px; }
@@ -43,14 +47,28 @@
   .chip { font-size:11px; padding:1px 7px; border-radius:99px; background:var(--card); border:1px solid var(--line); color:var(--mute); }
   .chip.warn { color:#b45309; border-color:#b45309; }
   .note { margin-top:4px; font-size:12px; color:#dc2626; }
+  .tools { border-top:1px solid var(--line); margin-top:8px; padding-top:8px; font-size:13px; }
+  .tools summary { cursor:pointer; color:var(--mute); }
+  .tools .row { margin-top:6px; }
+  .checks { margin:4px 0 0; padding-left:18px; color:#b45309; font-size:12px; }
+  .out { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; margin-top:6px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .suggest { position:relative; margin-bottom:6px; padding:8px 30px 8px 10px; border:1px dashed var(--accent);
+             border-radius:10px; background:var(--card); cursor:pointer; font-size:14px; white-space:pre-wrap; }
+  .suggest:hover { background:var(--me); }
+  .suggest .hint { font-size:11px; color:var(--accent); font-weight:600; margin-bottom:2px; }
+  .suggest.wait { cursor:default; border-style:dotted; color:var(--mute); font-style:italic; }
+  .suggest.wait:hover { background:var(--card); }
+  .suggest .x { position:absolute; top:4px; right:6px; padding:0 6px; background:transparent; color:var(--mute); font-size:16px; }
   .link { margin-top:6px; padding:2px 8px; font-size:12px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; cursor:pointer; }
 </style>
 </head>
 <body>
 <h1>이음 시험 화면</h1>
-<p class="sub">왼쪽(학부모)에서 보내면 오른쪽(교사)에 2초 안에 나타납니다. 비밀번호는 모두 test1234.</p>
+<p class="sub">왼쪽(학부모)에서 보내면 오른쪽(교사)에 바로 나타납니다(WebSocket). 비밀번호는 모두 test1234.
+  <button id="bell" class="link">🔔 알림 켜기</button></p>
 <div class="switch" id="sw" hidden>
-  <label><input type="checkbox" id="swBox"> 정제 켜기 (Claude API 호출)</label>
+  <label><input type="checkbox" id="swBox"> Claude 켜기 (정제 · 초안 API 호출)</label>
   <span class="note" id="swNote"></span>
 </div>
 <div class="grid" id="grid"></div>
@@ -74,13 +92,30 @@ function panel(title, defaultLogin) {
     <div class="err"></div>
     <div class="who"></div>
     <div class="msgs"><div class="empty">로그인하면 대화가 보입니다</div></div>
+    <div class="suggest" hidden></div>
     <div class="row">
-      <input class="text" placeholder="메시지 입력 후 Enter" disabled>
+      <textarea class="text" rows="2" placeholder="메시지 입력 후 Enter (줄바꿈은 Shift+Enter)" disabled></textarea>
       <button class="send" disabled>보내기</button>
+    </div>
+    <div class="tools" hidden>
+      <div class="row">
+        <input class="memo" placeholder="답장에 담을 내용 (예: 보건실 다녀옴, 체육 선생님께 전달함) — 비워도 됨">
+        <button class="draft">메모로 초안 쓰기</button>
+      </div>
+      <ul class="checks reply-checks"></ul>
+      <details>
+        <summary>공지 초안 만들기</summary>
+        <div class="row"><textarea class="points" rows="3" placeholder="공지 요점 (예: 11/14 현장학습, 9시 운동장, 도시락 · 물)"></textarea></div>
+        <div class="row"><button class="notice">공지 초안</button></div>
+        <div class="notice-out"></div>
+      </details>
     </div>`;
   const q = s => el.querySelector(s);
   q(".login").value = defaultLogin;
   let token = null, me = null, convId = null, timer = null;
+  let sock = null, live = false, gen = 0;   // gen: 다시 로그인하면 옛 연결의 재접속을 멈춘다
+  let seen = null;                          // 메시지 id → 상태 (띵 판단용, 처음 읽을 때는 null)
+  let busy = false, again = false;          // 새로 읽기가 겹치지 않게
 
   async function api(path, opt = {}) {
     const r = await fetch(API + path, { ...opt, headers: {
@@ -131,16 +166,93 @@ function panel(title, defaultLogin) {
     return d;
   }
 
+  // 자동 답장 추천: 마지막 메시지가 정제된 학부모 글이면 입력칸 위에 띄운다. 누르면 입력칸에 들어간다
+  const dismissed = new Set();
+  let suggestKey = "";
+  function renderSuggest(list) {
+    const box = q(".suggest");
+    const last = list[list.length - 1];
+    const show = me.role === "teacher" && last && last.sender_id !== me.id && last.status === "done" && !dismissed.has(last.id);
+    const rd = show ? (last.analysis || {}).reply_draft : null;
+    // 추천이 아직 없을 때: 방금 온 글이면 「만드는 중」, 오래된 글(기능 전에 온 글 등)이면 아무것도 안 띄운다
+    const fresh = show && Date.now() - new Date(last.created_at) < 90000;
+    const key = !show ? "" : !rd ? (fresh ? `${last.id}:wait` : "") : rd.error ? "" : `${last.id}:ok`;
+    if (key === suggestKey) return;  // 2초마다 새로 그리지 않게
+    suggestKey = key;
+    box.innerHTML = "";
+    box.hidden = !key;
+    box.className = "suggest" + (rd ? "" : " wait");
+    box.onclick = null;
+    if (!key) return;
+    if (!rd) { box.textContent = "답장 추천 만드는 중…"; return; }
+    box.appendChild(mk("div", "hint", "추천 답장 — 누르면 입력칸에 들어갑니다" + (rd.check.length ? ` (확인할 것 ${rd.check.length}개)` : "")));
+    box.appendChild(mk("div", "", rd.draft));
+    const x = mk("button", "x", "×");
+    x.title = "닫기";
+    x.onclick = e => { e.stopPropagation(); dismissed.add(last.id); renderSuggest(list); };
+    box.appendChild(x);
+    box.onclick = () => {
+      const ta = q(".text");
+      ta.value = rd.draft;
+      showChecks(q(".reply-checks"), rd.check);
+      ta.focus();
+      // 첫 빈칸 [ ] · [있습니다 / 없습니다] 를 골라 둔다 → 바로 타자로 덮어쓰면 된다
+      const i = rd.draft.indexOf("["), j = rd.draft.indexOf("]", i);
+      if (i >= 0 && j > i) ta.setSelectionRange(i, j + 1);
+    };
+  }
+
+  // 띵: 교사 = 학부모 글이 정제되어 읽을 수 있게 됐을 때, 학부모 = 교사 글이 새로 왔을 때
+  function checkDing(list) {
+    if (seen !== null) {
+      for (const m of list) {
+        if (m.sender_id === me.id) continue;
+        const prev = seen.get(m.id);
+        if (me.role === "teacher" && m.status === "done" && prev !== "done") ding(`${me.name} 선생님 · 새 메시지`, m.refined_text);
+        if (me.role !== "teacher" && m.status === "skip" && prev === undefined) ding(`${me.name} · 선생님 답장`, m.raw_text);
+      }
+    }
+    seen = new Map(list.map(m => [m.id, m.status]));
+  }
+
+  function setLive(on) {
+    live = on;
+    const b = q(".live");
+    if (b) { b.textContent = on ? "● 실시간 연결" : "● 연결 끊김 (2초마다 확인)"; b.className = "live " + (on ? "on" : "off"); }
+  }
+
+  function connect(myGen) {
+    if (myGen !== gen) return;
+    const ws = new WebSocket(API.replace(/^http/, "ws") + "/ws");
+    sock = ws;
+    ws.onopen = () => ws.send(JSON.stringify({ token }));  // 토큰은 주소가 아니라 첫 메시지로
+    ws.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if (d.type === "ready") { setLive(true); refresh(); }
+      if (d.type === "changed" && d.conversation_id === convId) refresh();
+    };
+    ws.onclose = () => {
+      if (sock === ws) setLive(false);
+      setTimeout(() => connect(myGen), 3000);  // 서버를 다시 켜면 알아서 다시 붙는다
+    };
+  }
+
   async function refresh() {
     if (!convId) return;
+    if (busy) { again = true; return; }
+    busy = true;
     try {
       const list = await api(`/conversations/${convId}/messages`);
+      checkDing(list);
       const box = q(".msgs");
       const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
       box.innerHTML = list.length ? "" : '<div class="empty">아직 메시지가 없습니다</div>';
       for (const m of list) box.appendChild(renderMsg(m));
+      renderSuggest(list);
       if (atBottom) box.scrollTop = box.scrollHeight;
     } catch (e) { q(".err").textContent = e.message; }
+    busy = false;
+    if (again) { again = false; refresh(); }
   }
 
   q(".go").onclick = async () => {
@@ -155,10 +267,19 @@ function panel(title, defaultLogin) {
       // 내 id 는 첫 대화의 teacher_id/parent_id 로 알아냄
       me.id = res.role === "teacher" ? convs[0].teacher_id : convs[0].parent_id;
       q(".who").textContent = `${res.name} (${res.role}) · 대화 #${convId} · 학생 ${convs[0].student_name}`;
+      q(".who").appendChild(mk("span", "live"));
       q(".text").disabled = q(".send").disabled = false;
+      q(".tools").hidden = res.role !== "teacher";
       clearInterval(timer);
+      seen = null;
+      gen += 1;
+      if (sock) sock.close();
+      setLive(false);
+      connect(gen);
       refresh();
-      timer = setInterval(refresh, 2000);
+      // 실시간 연결이 있으면 알림이 올 때만 읽고(30초마다 한 번은 확인), 끊겼으면 예전처럼 2초마다 읽는다
+      let ticks = 0;
+      timer = setInterval(() => { ticks += 1; if (!live || ticks % 15 === 0) refresh(); }, 2000);
     } catch (e) { q(".err").textContent = e.message; }
   };
 
@@ -166,13 +287,45 @@ function panel(title, defaultLogin) {
     const t = q(".text").value.trim();
     if (!t) return;
     q(".text").value = "";
+    q(".reply-checks").innerHTML = "";
     try {
       await api(`/conversations/${convId}/messages`, { method: "POST", body: JSON.stringify({ text: t }) });
       refresh();
     } catch (e) { q(".err").textContent = e.message; }
   }
   q(".send").onclick = send;
-  q(".text").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) send(); });
+  q(".text").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+
+  function showChecks(ul, items) {
+    ul.innerHTML = "";
+    for (const c of items) ul.appendChild(mk("li", "", "확인: " + c));
+  }
+
+  // 답장 초안 → 입력칸에 넣는다. 교사가 고쳐서 「보내기」
+  q(".draft").onclick = async () => {
+    const b = q(".draft");
+    b.disabled = true; b.textContent = "만드는 중…"; q(".err").textContent = "";
+    try {
+      const d = await api(`/conversations/${convId}/draft`, { method: "POST", body: JSON.stringify({ memo: q(".memo").value.trim() || null }) });
+      q(".text").value = d.draft;
+      showChecks(q(".reply-checks"), d.check);
+    } catch (e) { q(".err").textContent = e.message; }
+    b.disabled = false; b.textContent = "메모로 초안 쓰기";
+  };
+
+  // 공지 초안 → 보여 주기만 (공지 테이블 · 보내기는 아직 없음)
+  q(".notice").onclick = async () => {
+    const b = q(".notice"), out = q(".notice-out");
+    b.disabled = true; b.textContent = "만드는 중…"; q(".err").textContent = "";
+    try {
+      const d = await api("/drafts/notice", { method: "POST", body: JSON.stringify({ points: q(".points").value }) });
+      out.innerHTML = "";
+      out.appendChild(mk("div", "out", `[${d.title}]\n\n${d.body}`));
+      const ul = mk("ul", "checks"); showChecks(ul, d.check); out.appendChild(ul);
+    } catch (e) { q(".err").textContent = e.message; }
+    b.disabled = false; b.textContent = "공지 초안";
+  };
   return el;
 }
 
@@ -181,7 +334,7 @@ const swBox = document.getElementById("swBox"), swNote = document.getElementById
 function showSwitch(on) {
   swBox.checked = on;
   sw.classList.toggle("on", on);
-  swNote.textContent = on ? "켜짐 — 학부모 메시지마다 Claude 를 부릅니다 (건당 약 $0.006)" : "꺼짐 — API 를 안 부릅니다. 보낸 메시지는 「정제하지 못했습니다」로 남고, 켠 뒤 「다시 정제」로 정제합니다";
+  swNote.textContent = on ? "켜짐 — 학부모 메시지마다, 초안 버튼을 누를 때마다 Claude 를 부릅니다 (건당 약 $0.006)" : "꺼짐 — API 를 안 부릅니다. 보낸 메시지는 「정제하지 못했습니다」로 남고(켠 뒤 「다시 정제」), 초안 버튼은 오류가 납니다";
 }
 fetch(API + "/dev/refine").then(r => r.ok ? r.json() : null).then(d => { if (d) { sw.hidden = false; showSwitch(d.enabled); } }).catch(() => {});
 swBox.onchange = async () => {
@@ -190,6 +343,45 @@ swBox.onchange = async () => {
     showSwitch((await r.json()).enabled);
   } catch (e) { swNote.textContent = "스위치 오류: " + e.message; swBox.checked = !swBox.checked; }
 };
+
+// 🔔 알림: 브라우저는 사용자가 한 번 누르기 전에는 소리를 막는다 → 버튼으로 켠다. 알림 창은 권한을 물어본다
+let audio = null;
+const bell = document.getElementById("bell");
+// 소리는 화면을 아무 데나 한 번 누르거나 타자를 치면 켜진다 (알림 창 허용은 한 번 하면 브라우저가 기억함)
+function wakeAudio() {
+  audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+  audio.resume();
+  if (bell.textContent === "🔔 알림 켜기") bell.textContent = "🔔 소리 켜짐 — 알림 창도 쓰려면 누르세요";
+  if ("Notification" in window && Notification.permission === "granted") bell.textContent = "🔔 알림 켜짐 (소리 + 알림 창)";
+}
+document.addEventListener("pointerdown", wakeAudio, { once: true, capture: true });
+document.addEventListener("keydown", wakeAudio, { once: true, capture: true });
+bell.onclick = async () => {
+  audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+  await audio.resume();
+  if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+  const pop = "Notification" in window && Notification.permission === "granted";
+  bell.textContent = pop ? "🔔 알림 켜짐 (소리 + 알림 창)" : "🔔 알림 켜짐 (소리만 — 알림 창은 브라우저 설정에서 허용)";
+  beep();
+};
+function beep() {
+  if (!audio) return;
+  const t = audio.currentTime;
+  for (const [f, at] of [[880, 0], [1320, 0.12]]) {  // 띵-동
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = f; o.type = "sine";
+    g.gain.setValueAtTime(0.0001, t + at);
+    g.gain.exponentialRampToValueAtTime(0.3, t + at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.35);
+    o.connect(g).connect(audio.destination);
+    o.start(t + at); o.stop(t + at + 0.4);
+  }
+}
+function ding(title, body) {
+  beep();
+  if ("Notification" in window && Notification.permission === "granted" && audio)
+    new Notification(title, { body: (body || "").slice(0, 80) });
+}
 
 const grid = document.getElementById("grid");
 grid.append(panel("학부모 화면", "parent1"), panel("교사 화면", "teacher1"));

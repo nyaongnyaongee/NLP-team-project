@@ -37,6 +37,40 @@ def get_masker(roster: list[str], adults: list[str]) -> PiiMasker:
     return _build_masker(tuple(sorted(set(roster))), tuple(sorted(set(adults))))
 
 
+def call_and_parse(call: Callable[[str], ClaudeReply], masked: str, log: logging.Logger) -> tuple[dict | None, str | None]:
+    """Claude 를 부르고 응답 상태 · JSON 을 점검한다. (parsed, None) 또는 (None, 실패 사유).
+    정제 · 초안이 같이 쓴다. 사유에는 원문 · 가린 글을 넣지 않는다."""
+    try:
+        reply = call(masked)
+    except anthropic.APIStatusError as e:
+        log.warning("Claude 호출 실패 status=%s", e.status_code)
+        return None, f"Claude 호출 실패 (HTTP {e.status_code})"
+    except anthropic.APIError as e:  # 연결 · 시간 초과 등
+        log.warning("Claude 호출 실패 %s", type(e).__name__)
+        return None, f"Claude 호출 실패 ({type(e).__name__})"
+    except Exception as e:
+        log.exception("호출 중 예기치 못한 오류")
+        return None, f"Claude 호출 중 오류 ({type(e).__name__})"
+
+    u = reply.usage
+    log.info("model=%s stop=%s sec=%.1f in=%s out=%s cache_read=%s cache_write=%s", reply.model, reply.stop_reason,
+             reply.seconds, u.get("input"), u.get("output"), u.get("cache_read"), u.get("cache_write"))
+
+    if reply.stop_reason == "refusal":
+        return None, f"Claude 가 응답을 거절함 ({reply.stop_category or '분류 없음'})"
+    if reply.stop_reason == "max_tokens":
+        return None, "응답이 길이 한도에서 잘림 (max_tokens)"
+    if reply.stop_reason != "end_turn":
+        return None, f"정상 종료가 아님 ({reply.stop_reason})"
+    try:
+        parsed = json.loads(reply.text)
+        if not isinstance(parsed, dict):
+            raise ValueError
+    except ValueError:
+        return None, "응답이 JSON 형식이 아님"
+    return parsed, None
+
+
 def _failed(error: str) -> dict:
     return {"status": "failed", "refined_text": None, "analysis": None, "error": error}
 
@@ -92,38 +126,10 @@ def refine_message(
         log.exception("가명처리 실패")
         return _failed(f"가명처리 실패 ({type(e).__name__})")
 
-    # 2. Claude
-    try:
-        reply = call(masked)
-    except anthropic.APIStatusError as e:
-        log.warning("Claude 호출 실패 status=%s", e.status_code)
-        return _failed(f"Claude 호출 실패 (HTTP {e.status_code})")
-    except anthropic.APIError as e:  # 연결 · 시간 초과 등
-        log.warning("Claude 호출 실패 %s", type(e).__name__)
-        return _failed(f"Claude 호출 실패 ({type(e).__name__})")
-    except Exception as e:
-        log.exception("호출 중 예기치 못한 오류")
-        return _failed(f"정제 중 오류 ({type(e).__name__})")
-
-    u = reply.usage
-    log.info("model=%s stop=%s sec=%.1f in=%s out=%s cache_read=%s cache_write=%s", reply.model, reply.stop_reason,
-             reply.seconds, u.get("input"), u.get("output"), u.get("cache_read"), u.get("cache_write"))
-
-    # 3. 응답 상태
-    if reply.stop_reason == "refusal":
-        return _failed(f"Claude 가 응답을 거절함 ({reply.stop_category or '분류 없음'})")
-    if reply.stop_reason == "max_tokens":
-        return _failed("응답이 길이 한도에서 잘림 (max_tokens)")
-    if reply.stop_reason != "end_turn":
-        return _failed(f"정상 종료가 아님 ({reply.stop_reason})")
-
-    # 4. JSON
-    try:
-        parsed = json.loads(reply.text)
-        if not isinstance(parsed, dict):
-            raise ValueError
-    except ValueError:
-        return _failed("응답이 JSON 형식이 아님")
+    # 2~4. Claude → 응답 상태 → JSON
+    parsed, error = call_and_parse(call, masked, log)
+    if error:
+        return _failed(error)
 
     # 5. 검증 (복원 전, 가린 상태에서)
     with _mask_lock:

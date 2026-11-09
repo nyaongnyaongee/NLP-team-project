@@ -1,7 +1,9 @@
 """Claude 호출 (SDK 는 여기서만 쓴다).  [재관]
 
-정제(A)용 호출 하나: system=prompts/refine_system.txt (캐시), user=가린 원문,
-출력은 prompts/refine_schema.json 형식의 JSON.
+기능마다 system 프롬프트(캐시) + 출력 JSON 스키마 한 쌍:
+- 정제(A)     call_refine        prompts/refine_system.txt       · refine_schema.json
+- 답장 초안(B) call_draft_reply   prompts/draft_reply_system.txt  · draft_reply_schema.json
+- 공지 초안(B) call_draft_notice  prompts/draft_notice_system.txt · draft_notice_schema.json
 
 가린 글(masked)만 받는다. 원문 · 매핑표는 이 파일에 들어오지 않는다.
 """
@@ -16,8 +18,16 @@ from pathlib import Path
 import anthropic
 
 PROMPTS = Path(__file__).parent / "prompts"
-SYSTEM_PROMPT = (PROMPTS / "refine_system.txt").read_text(encoding="utf-8")
-REFINE_SCHEMA = json.loads((PROMPTS / "refine_schema.json").read_text(encoding="utf-8"))
+
+
+def _load(name: str) -> tuple[str, dict]:
+    return ((PROMPTS / f"{name}_system.txt").read_text(encoding="utf-8"),
+            json.loads((PROMPTS / f"{name}_schema.json").read_text(encoding="utf-8")))
+
+
+SYSTEM_PROMPT, REFINE_SCHEMA = _load("refine")
+DRAFT_REPLY_PROMPT, DRAFT_REPLY_SCHEMA = _load("draft_reply")
+DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA = _load("draft_notice")
 
 DEFAULT_EFFORT = "medium"  # 12건 시험(2026-11-08)에서 medium 으로 쟀음. 모델 · effort 는 더 시험해서 정한다
 MAX_TOKENS = 4000
@@ -55,17 +65,32 @@ def default_model() -> str:
     return settings.claude_model
 
 
-def call_refine(masked: str, *, model: str | None = None, effort: str = DEFAULT_EFFORT,
-                client: anthropic.Anthropic | None = None) -> ClaudeReply:
-    """가린 원문 하나를 정제 · 분석한다. 실패하면 anthropic 예외가 그대로 올라간다 (부르는 쪽이 잡음)."""
+def call_refine(masked: str, **kw) -> ClaudeReply:
+    """가린 원문 하나를 정제 · 분석한다."""
+    return call_json(SYSTEM_PROMPT, REFINE_SCHEMA, masked, **kw)
+
+
+def call_draft_reply(masked: str, **kw) -> ClaudeReply:
+    """가린 대화 + 교사 메모로 답장 초안을 쓴다."""
+    return call_json(DRAFT_REPLY_PROMPT, DRAFT_REPLY_SCHEMA, masked, **kw)
+
+
+def call_draft_notice(masked: str, **kw) -> ClaudeReply:
+    """가린 공지 요점으로 공지 초안을 쓴다."""
+    return call_json(DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA, masked, **kw)
+
+
+def call_json(system: str, schema: dict, masked: str, *, model: str | None = None, effort: str = DEFAULT_EFFORT,
+              client: anthropic.Anthropic | None = None) -> ClaudeReply:
+    """가린 글 하나를 보내고 schema 형식의 JSON 을 받는다. 실패하면 anthropic 예외가 그대로 올라간다 (부르는 쪽이 잡음)."""
     client = client or get_client()
     model = model or default_model()
     params = dict(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": masked}],
-        output_config={"effort": effort, "format": {"type": "json_schema", "schema": REFINE_SCHEMA}},
+        output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
     )
     start = time.time()
     if model in FALLBACK_MODELS:

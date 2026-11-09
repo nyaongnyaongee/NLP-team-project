@@ -40,6 +40,38 @@ def _stop(signum, frame):
     raise KeyboardInterrupt  # 터미널을 닫아도 (SIGHUP) · kill 해도 (SIGTERM) 같은 정리 경로로
 
 
+def _ps(pid: int, field: str) -> str:
+    r = subprocess.run(["ps", "-o", f"{field}=", "-p", str(pid)], capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def stop_leftovers():
+    """예전에 켠 dev.py(다른 터미널 탭에서 안 끈 것)가 8000 · 5173 을 잡고 있으면 끄고 이어서 켠다.
+    이 저장소의 백엔드 · 확인 화면일 때만 끈다. 다른 프로그램이면 건드리지 않고 알려 준다.  (Mac · Linux 만, Windows 는 안내만)"""
+    if sys.platform == "win32" or not shutil.which("lsof"):
+        return
+    targets = set()
+    for port in (8000, 5173):
+        r = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"], capture_output=True, text=True)
+        for pid in map(int, r.stdout.split()):
+            cmd = _ps(pid, "command")
+            if "uvicorn app.main:app" not in cmd and str(DEV) not in cmd:
+                continue  # 남의 프로그램
+            parent = int(_ps(pid, "ppid") or 0)
+            # 옛 dev.py 를 끄면 그것이 자기 자식(서버) · PostgreSQL 을 정리한다. 자식만 끄면 옛 dev.py 가 남아 엉킨다
+            targets.add(parent if parent and "dev/dev.py" in _ps(parent, "command") else pid)
+    if not targets:
+        return
+    print("예전에 켠 확인 화면이 남아 있어 끄는 중...")
+    for pid in targets:
+        os.kill(pid, signal.SIGTERM)
+    for _ in range(50):  # 옛 dev.py 가 정리를 끝낼 때까지 (최대 10초)
+        if not any(_ps(pid, "pid") for pid in targets):
+            break
+        time.sleep(0.2)
+    time.sleep(0.5)
+
+
 def check_env():
     env = BACKEND / ".env"
     if not env.exists():
@@ -67,9 +99,11 @@ def main():
             signal.signal(getattr(signal, name), _stop)
     if not VENV_PY.exists():
         sys.exit(f"{VENV_PY} 가 없습니다. README 대로 backend/.venv 를 먼저 만드세요.")
+    stop_leftovers()
     for port, name in ((8000, "백엔드"), (5173, "확인 화면")):
         if port_open(port):
-            sys.exit(f"{port} 번 포트를 이미 쓰는 프로그램이 있습니다. 이미 켜져 있으면 그대로 브라우저로 여세요 ({name}).")
+            sys.exit(f"{port} 번 포트를 다른 프로그램이 쓰고 있습니다 ({name}). 그 프로그램을 끄고 다시 실행하세요.\n"
+                     f"  누가 쓰는지 보기 (Mac): lsof -nP -iTCP:{port} -sTCP:LISTEN")
 
     # 1. PostgreSQL (Mac 은 brew 로 켬, Windows 는 보통 서비스가 이미 켜져 있음)
     pg_started_by_me = False
