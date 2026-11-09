@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "draft": {
+      "type": "string"
+    },
+    "check": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "draft",
+    "check"
+  ],
+  "additionalProperties": false
+}

@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, messages
+from app.routers import auth, drafts, messages, ws
 
 app = FastAPI(title="이음")
 app.add_middleware(
@@ -10,6 +10,8 @@ app.add_middleware(
 )
 app.include_router(auth.router)
 app.include_router(messages.router)
+app.include_router(drafts.router)
+app.include_router(ws.router)
 
 
 @app.get("/health")

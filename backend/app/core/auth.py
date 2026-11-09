@@ -34,20 +34,24 @@ def make_token(user_id: int) -> str:
     return body.decode() + "." + _sign(body)
 
 
-def current_user(token: str | None = Depends(_oauth2), db: Session = Depends(get_db)):
-    unauthorized = HTTPException(401, "로그인이 필요합니다")
-    if token is None:
-        raise unauthorized
+def user_from_token(token: str | None, db: Session):
+    """토큰이 맞으면 사용자, 아니면 None.  HTTP(current_user) 와 WebSocket(routers/ws.py) 이 같이 쓴다."""
+    if not token:
+        return None
     try:
         body, sig = token.split(".")
         if not hmac.compare_digest(sig, _sign(body.encode())):
-            raise unauthorized
+            return None
         data = json.loads(base64.urlsafe_b64decode(body))
-    except (ValueError, TypeError):
-        raise unauthorized
-    if data["exp"] < time.time():
-        raise unauthorized
-    user = crud.get_user(db, data["uid"])
+        if data["exp"] < time.time():
+            return None
+        return crud.get_user(db, data["uid"])
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
+def current_user(token: str | None = Depends(_oauth2), db: Session = Depends(get_db)):
+    user = user_from_token(token, db)
     if user is None:
-        raise unauthorized
+        raise HTTPException(401, "로그인이 필요합니다")
     return user

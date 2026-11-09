@@ -72,6 +72,16 @@ def save_refine_result(db: Session, msg_id: int, result: dict) -> None:
     db.commit()
 
 
+def save_reply_draft(db: Session, msg_id: int, draft: dict) -> None:
+    """자동 답장 추천(B)을 analysis.reply_draft 에 붙인다. 그사이 다시 정제가 눌려 done 이 아니면 안 붙인다."""
+    db.execute(
+        text("UPDATE messages SET analysis = analysis || jsonb_build_object('reply_draft', CAST(:d AS JSONB)) "
+             "WHERE id = :i AND status = 'done'"),
+        {"d": json.dumps(draft, ensure_ascii=False), "i": msg_id},
+    )
+    db.commit()
+
+
 def adult_names(db: Session) -> list[str]:
     """가명처리 명단용 어른 실명 (교사 · 학부모, 성까지).  학생 명단은 DB 가 아니라 ai/sample_roster.json 으로 고정."""
     rows = db.execute(text("SELECT name FROM users WHERE role IN ('teacher', 'parent')")).mappings().all()
