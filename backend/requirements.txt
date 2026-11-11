@@ -3,6 +3,7 @@ uvicorn[standard]
 sqlalchemy
 psycopg[binary]
 pydantic-settings
+pydantic>=2,<3
 anthropic
 kiwipiepy==0.24.1
 python-multipart
