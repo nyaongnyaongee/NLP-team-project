@@ -2,6 +2,7 @@
 import json
 
 import pytest
+from sqlalchemy import text
 
 from app.ai import refine as refine_module
 from app.ai.client import ClaudeReply
@@ -75,6 +76,69 @@ def test_학부모가_보내면_응답은_pending_이고_곧_정제문이_저장
     assert msg["analysis"]["deadline"] == "내일까지"
     # Claude 에게는 진짜 이름이 가려져서 갔다 (학생은 시연 명단, 교사는 어른 명단)
     assert len(seen) == 1 and "지민" not in seen[0] and "김민지" not in seen[0]
+
+
+def test_명시적_통과는_원문만_교사에게_보이고_AI_문장과_인용을_저장하지_않는다(client, auth, ids, engine, refine_with):
+    refine_with(lambda m: reply({**good(m), "needs_refinement": False}))
+    conv = ids["conv_parent1"]
+    sent = send(client, auth, "parent1", conv, RAW).json()
+    assert sent["status"] == "pending" and sent["raw_text"] == RAW
+
+    teacher = read(client, auth, "teacher1", conv)[0]
+    assert teacher["status"] == "done"
+    assert teacher["raw_text"] == RAW
+    assert teacher["refined_text"] is None and teacher["analysis"] is None
+    with engine.connect() as c:
+        row = c.execute(text("SELECT raw_text, refined_text, analysis, status FROM messages WHERE id = :i"),
+                        {"i": sent["id"]}).one()
+    assert row == (RAW, None, {"needs_refinement": False}, "done")
+    parent = read(client, auth, "parent1", conv)[0]
+    assert parent["raw_text"] == RAW and parent["refined_text"] is None and parent["analysis"] is None
+
+
+def test_최상위_판정값_false도_원문_통과로_처리한다(client, auth, ids, engine, monkeypatch):
+    monkeypatch.setattr(router_mod, "_refine_in_background", REAL_BACKGROUND)
+    monkeypatch.setitem(router_mod._refine_state, "enabled", True)
+    monkeypatch.setattr(router_mod, "refine_message", lambda *a: {
+        "status": "done", "needs_refinement": False, "refined_text": "버려야 할 정제문",
+        "analysis": {"quotes": [RAW], "topic": "버려야 할 분석"}, "error": None,
+    })
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    teacher = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert teacher["raw_text"] == RAW and teacher["refined_text"] is None
+    with engine.connect() as c:
+        assert c.execute(text("SELECT analysis FROM messages")).scalar() == {"needs_refinement": False}
+
+
+def test_명시적_정제는_정제문만_교사에게_보인다(client, auth, ids, refine_with):
+    refine_with(lambda m: reply({**good(m), "needs_refinement": True, "abusive": False}))
+    conv = ids["conv_parent1"]
+    send(client, auth, "parent1", conv, RAW)
+    teacher = read(client, auth, "teacher1", conv)[0]
+    assert teacher["status"] == "done" and teacher["raw_text"] is None
+    assert teacher["refined_text"] is not None and "무능하네요" not in teacher["refined_text"]
+
+
+def test_abusive_false만으로는_통과시키지_않는다(client, auth, ids, refine_with):
+    refine_with(lambda m: reply({**good(m), "abusive": False}))
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    teacher = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert teacher["status"] == "done" and teacher["raw_text"] is None
+    assert teacher["refined_text"] is not None
+
+
+def test_판정_없이_정제문이_빠진_완료_결과는_실패로_닫는다(client, auth, ids, engine, monkeypatch):
+    monkeypatch.setattr(router_mod, "_refine_in_background", REAL_BACKGROUND)
+    monkeypatch.setitem(router_mod._refine_state, "enabled", True)
+    monkeypatch.setattr(router_mod, "refine_message", lambda *a: {
+        "status": "done", "refined_text": None, "analysis": {}, "error": None,
+    })
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    teacher = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert teacher["status"] == "failed" and teacher["raw_text"] is None
+    assert teacher["analysis"]["error"] == "정제 결과에 정제문이 없습니다"
+    with engine.connect() as c:
+        assert c.execute(text("SELECT raw_text FROM messages")).scalar() == RAW
 
 
 def test_거절되면_failed_와_사유가_저장된다(client, auth, ids, refine_with):
@@ -174,6 +238,17 @@ def test_교사가_보낸_글은_양쪽_모두_그대로_보인다(client, auth,
     send(client, auth, "teacher1", conv, "확인해 보겠습니다")
     for who in ("teacher1", "parent1"):
         assert read(client, auth, who, conv)[0]["raw_text"] == "확인해 보겠습니다"
+
+
+def test_초안은_자동으로_만들거나_DB에_저장하지_않는다(client, auth, ids, engine, refine_with, monkeypatch):
+    from app.routers import drafts
+
+    refine_with(lambda m: reply(good(m)))
+    monkeypatch.setattr(drafts, "draft_reply", lambda *a, **k: pytest.fail("자동 초안 호출"))
+    sent = send(client, auth, "parent1", ids["conv_parent1"], RAW).json()
+    with engine.connect() as c:
+        analysis = c.execute(text("SELECT analysis FROM messages WHERE id = :i"), {"i": sent["id"]}).scalar()
+    assert "reply_draft" not in analysis
 
 
 # ---------------------------------------------------------------- 시험용 스위치 (정제 켜고 끄기)

@@ -60,6 +60,40 @@ def test_교사는_정제문과_자기_글로_초안을_받는다(client, auth, 
     assert "무능" not in sent and "아직 정제 안 된" not in sent  # 원문 · 정제 안 된 글은 Claude 에게도 안 간다
 
 
+def test_통과한_원문과_정제문을_초안_문맥에_넣고_초안은_저장하지_않는다(client, auth, ids, engine, claude):
+    conv = ids["conv_parent1"]
+    with engine.begin() as c:
+        passed = c.execute(text(
+            "INSERT INTO messages (conversation_id, sender_id, raw_text, analysis, status) "
+            "VALUES (:c, :s, :r, '{\"needs_refinement\": false}'::jsonb, 'done') RETURNING id"
+        ), {"c": conv, "s": ids["parent1"], "r": "체육 시간에 넘어졌어요."}).scalar()
+        refined = c.execute(text(
+            "INSERT INTO messages (conversation_id, sender_id, raw_text, refined_text, analysis, status) "
+            "VALUES (:c, :s, :r, :f, '{}'::jsonb, 'done') RETURNING id"
+        ), {"c": conv, "s": ids["parent1"], "r": "무능한 교사", "f": "상황을 알려 주세요."}).scalar()
+    seen = claude(lambda m: reply({"draft": "확인해 보겠습니다.", "check": []}))
+
+    response = ask(client, auth, "teacher1", conv)
+    assert response.status_code == 200
+    assert response.json()["draft"] == "확인해 보겠습니다."
+    assert "학부모: 체육 시간에 넘어졌어요." in seen[0]
+    assert "학부모: 상황을 알려 주세요." in seen[0]
+    assert "무능한 교사" not in seen[0]
+    with engine.connect() as c:
+        rows = c.execute(text("SELECT id, analysis FROM messages WHERE id IN (:p, :r) ORDER BY id"),
+                         {"p": passed, "r": refined}).all()
+    assert rows == [(passed, {"needs_refinement": False}), (refined, {})]
+
+
+def test_판정_없이_완료됐으나_정제문이_없으면_초안_문맥에서_제외한다(client, auth, ids, engine, claude):
+    put(engine, ids["conv_parent1"], ids["parent1"], "done", "공개하면 안 되는 원문")
+    seen = claude(lambda m: reply({"draft": "x", "check": []}))
+    teacher = client.get(f"/conversations/{ids['conv_parent1']}/messages", headers=auth("teacher1")).json()[0]
+    assert teacher["raw_text"] is None
+    assert ask(client, auth, "teacher1", ids["conv_parent1"]).status_code == 409
+    assert seen == []
+
+
 def test_학부모는_초안을_못_만든다(client, auth, ids, engine, claude):
     put(engine, ids["conv_parent1"], ids["parent1"], "done", "원문", "정제문")
     claude(lambda m: reply({"draft": "x", "check": []}))
@@ -100,76 +134,3 @@ def test_공지_초안은_교사만(client, auth, claude):
     assert r.status_code == 200 and r.json()["title"] == "현장학습 안내"
     assert client.post("/drafts/notice", json={"points": "x"}, headers=auth("parent1")).status_code == 403
     assert client.post("/drafts/notice", json={"points": ""}, headers=auth("teacher1")).status_code == 422
-
-
-# ---------------------------------------------------------------- 자동 답장 추천 (정제 바로 뒤 백그라운드)
-
-REAL_AUTO = router_mod.auto_draft  # conftest 가 autouse 로 끄기 전의 진짜 함수
-
-
-def last_id(engine):
-    with engine.begin() as c:
-        return c.execute(text("SELECT max(id) FROM messages")).scalar()
-
-
-def put_done(engine, conv, sender, refined):
-    with engine.begin() as c:
-        c.execute(text("INSERT INTO messages (conversation_id, sender_id, raw_text, refined_text, analysis, status) "
-                       "VALUES (:c, :s, '원문', :f, CAST(:a AS JSONB), 'done')"),
-                  {"c": conv, "s": sender, "f": refined, "a": json.dumps({"topic": "건강 · 안전", "quotes": ["원문"]})})
-    return last_id(engine)
-
-
-def analysis_for(client, auth, who, conv, msg_id):
-    msgs = client.get(f"/conversations/{conv}/messages", headers=auth(who)).json()
-    return next(m for m in msgs if m["id"] == msg_id)["analysis"]
-
-
-def test_정제된_학부모_글에_답장_추천이_붙고_교사만_본다(client, auth, ids, engine, claude):
-    conv = ids["conv_parent1"]
-    msg = put_done(engine, conv, ids["parent1"], "보건실에 다녀왔는지 알려 주세요.")
-    seen = claude(lambda m: reply({"draft": "안녕하세요. [ ] 감사합니다.", "check": ["[ ] 자리를 채우세요"]}))
-
-    REAL_AUTO(msg, conv)
-    assert seen[0].endswith("[담임 메모]\n(없음)")  # 자동 추천은 메모 없이
-    a = analysis_for(client, auth, "teacher1", conv, msg)
-    assert a["reply_draft"] == {"draft": "안녕하세요. [ ] 감사합니다.", "check": ["[ ] 자리를 채우세요"]}
-    assert a["topic"] == "건강 · 안전" and "quotes" not in a  # 기존 분석은 그대로, 인용은 여전히 안 나감
-    assert analysis_for(client, auth, "parent1", conv, msg) is None
-
-
-def test_추천이_실패하면_사유만_붙는다(client, auth, ids, engine, claude):
-    msg = put_done(engine, ids["conv_parent1"], ids["parent1"], "정제문")
-    claude(lambda m: reply({}, stop="refusal"))
-    REAL_AUTO(msg, ids["conv_parent1"])
-    assert "거절" in analysis_for(client, auth, "teacher1", ids["conv_parent1"], msg)["reply_draft"]["error"]
-
-
-def test_교사가_이미_답했으면_추천을_만들지_않는다(client, auth, ids, engine, claude):
-    msg = put_done(engine, ids["conv_parent1"], ids["parent1"], "정제문")
-    put(engine, ids["conv_parent1"], ids["teacher1"], "skip", "답했습니다")
-    seen = claude(lambda m: reply({"draft": "x", "check": []}))
-    REAL_AUTO(msg, ids["conv_parent1"])
-    assert seen == []
-    assert "reply_draft" not in analysis_for(client, auth, "teacher1", ids["conv_parent1"], msg)
-
-
-def test_정제가_끝나면_자동_추천을_부른다(client, auth, ids, monkeypatch):
-    from app.routers import messages as mr
-
-    called = []
-    monkeypatch.setattr(router_mod, "auto_draft", lambda msg_id, conv_id: called.append(msg_id))
-    monkeypatch.setattr(mr, "_refine_in_background", REAL_REFINE_BG)
-    monkeypatch.setattr(mr, "refine_message", lambda *a: {"status": "done", "refined_text": "정제문",
-                                                         "analysis": {"topic": "기타"}, "error": None})
-    monkeypatch.setitem(mr._refine_state, "enabled", True)
-    r = client.post(f"/conversations/{ids['conv_parent1']}/messages", json={"text": "원문"}, headers=auth("parent1"))
-    assert called == [r.json()["id"]]
-
-    monkeypatch.setattr(mr, "refine_message", lambda *a: {"status": "failed", "refined_text": None,
-                                                         "analysis": None, "error": "실패"})
-    client.post(f"/conversations/{ids['conv_parent1']}/messages", json={"text": "원문"}, headers=auth("parent1"))
-    assert len(called) == 1  # 정제가 실패하면 추천도 안 만든다
-
-
-REAL_REFINE_BG = messages_router._refine_in_background
