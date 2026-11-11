@@ -2,13 +2,11 @@
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from app.routers import drafts as drafts_router
 from app.routers import messages as messages_router
 
 pytestmark = pytest.mark.usefixtures("clean_messages")
 
 REAL_BACKGROUND = messages_router._refine_in_background
-REAL_AUTO = drafts_router.auto_draft  # conftest 가 끄기 전의 진짜 함수
 
 
 def token(auth, who):
@@ -61,23 +59,6 @@ def test_정제가_끝나면_또_알린다(client, auth, ids, monkeypatch):
         send(client, auth, "parent1", conv)
         assert teacher.receive_json()["conversation_id"] == conv  # 저장됨 (정제 중)
         assert teacher.receive_json()["conversation_id"] == conv  # 정제 끝 (여기선 꺼져 있어 failed)
-    finally:
-        ctx.__exit__(None, None, None)
-
-
-def test_답장_추천이_붙으면_알린다(client, auth, ids, engine, monkeypatch):
-    from sqlalchemy import text
-
-    with engine.begin() as c:
-        msg = c.execute(text("INSERT INTO messages (conversation_id, sender_id, raw_text, refined_text, analysis, status) "
-                             "VALUES (:c, :s, '원문', '정제문', '{}'::jsonb, 'done') RETURNING id"),
-                        {"c": ids["conv_parent1"], "s": ids["parent1"]}).scalar()
-    monkeypatch.setattr(drafts_router, "draft_reply", lambda *a: {"status": "done", "draft": "안녕하세요.", "check": [],
-                                                                  "error": None})
-    ctx, teacher = connect(client, auth, "teacher1")
-    try:
-        REAL_AUTO(msg, ids["conv_parent1"])
-        assert teacher.receive_json() == {"type": "changed", "conversation_id": ids["conv_parent1"]}
     finally:
         ctx.__exit__(None, None, None)
 

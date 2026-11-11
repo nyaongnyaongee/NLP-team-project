@@ -30,6 +30,21 @@ def test_교사_메시지는_skip_으로_저장된다(client, auth, ids):
     assert r.status_code == 201 and r.json()["status"] == "skip"
 
 
+def test_교사가_수정한_최종_답장은_메시지로_저장된다(client, auth, ids, engine):
+    conv = ids["conv_parent1"]
+    answer = "확인했습니다. 내일 다시 알려드리겠습니다."
+    response = client.post(f"/conversations/{conv}/messages", json={"text": answer}, headers=auth("teacher1"))
+    assert response.status_code == 201
+    assert response.json()["status"] == "skip" and response.json()["raw_text"] == answer
+    assert response.json()["refined_text"] is None
+    with engine.connect() as c:
+        row = c.execute(text("SELECT raw_text, refined_text, status, sender_id FROM messages WHERE id = :i"),
+                        {"i": response.json()["id"]}).one()
+    assert row == (answer, None, "skip", ids["teacher1"])
+    visible = client.get(f"/conversations/{conv}/messages", headers=auth("parent1")).json()[0]
+    assert visible["raw_text"] == answer
+
+
 def test_교사는_학부모_메시지가_온_것을_보지만_원문은_못_본다(client, auth, ids, engine):
     conv = ids["conv_parent1"]
     client.post(f"/conversations/{conv}/messages", json={"text": "첫째"}, headers=auth("parent1"))
