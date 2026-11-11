@@ -94,8 +94,10 @@ def auth(client):
 def no_background_refine(monkeypatch):
     """학부모 메시지를 보내도 진짜 Claude 를 부르지 않게 정제를 꺼 둔다 (.env 에 키가 있어도 돈이 안 나가게).
     정제를 시험하는 파일만 refine_with 로 가짜 응답을 넣어 켠다."""
+    import app.routers.conversations as conversations_router
     import app.routers.drafts as drafts_router
     import app.routers.messages as messages_router
 
     monkeypatch.setattr(messages_router, "_refine_in_background", lambda *a, **k: None)
     monkeypatch.setattr(drafts_router, "auto_draft", lambda *a, **k: None)  # 정제 시험에서도 자동 추천은 진짜 Claude 를 안 부르게
+    monkeypatch.setattr(conversations_router, "_extract_in_background", lambda *a, **k: None)  # 대화를 닫아도 추출 안 함

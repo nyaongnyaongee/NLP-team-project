@@ -4,6 +4,7 @@
 - 정제(A)     call_refine        prompts/refine_system.txt       · refine_schema.json
 - 답장 초안(B) call_draft_reply   prompts/draft_reply_system.txt  · draft_reply_schema.json
 - 공지 초안(B) call_draft_notice  prompts/draft_notice_system.txt · draft_notice_schema.json
+- 할 일 · 일정(C) call_extract     prompts/extract_system.txt      · extract_schema.json
 
 가린 글(masked)만 받는다. 원문 · 매핑표는 이 파일에 들어오지 않는다.
 """
@@ -28,6 +29,7 @@ def _load(name: str) -> tuple[str, dict]:
 SYSTEM_PROMPT, REFINE_SCHEMA = _load("refine")
 DRAFT_REPLY_PROMPT, DRAFT_REPLY_SCHEMA = _load("draft_reply")
 DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA = _load("draft_notice")
+EXTRACT_PROMPT, EXTRACT_SCHEMA = _load("extract")
 
 DEFAULT_EFFORT = "medium"  # 12건 시험(2026-11-08)에서 medium 으로 쟀음. 모델 · effort 는 더 시험해서 정한다
 MAX_TOKENS = 4000
@@ -78,6 +80,11 @@ def call_draft_reply(masked: str, **kw) -> ClaudeReply:
 def call_draft_notice(masked: str, **kw) -> ClaudeReply:
     """가린 공지 요점으로 공지 초안을 쓴다."""
     return call_json(DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA, masked, **kw)
+
+
+def call_extract(masked: str, **kw) -> ClaudeReply:
+    """가린 대화에서 담임의 할 일 · 일정을 뽑는다."""
+    return call_json(EXTRACT_PROMPT, EXTRACT_SCHEMA, masked, **kw)
 
 
 def call_json(system: str, schema: dict, masked: str, *, model: str | None = None, effort: str = DEFAULT_EFFORT,

@@ -60,6 +60,17 @@
   .suggest.wait { cursor:default; border-style:dotted; color:var(--mute); font-style:italic; }
   .suggest.wait:hover { background:var(--card); }
   .suggest .x { position:absolute; top:4px; right:6px; padding:0 6px; background:transparent; color:var(--mute); font-size:16px; }
+  .tasks { margin-top:6px; display:flex; flex-direction:column; gap:4px; }
+  .task { display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--line); border-radius:8px; font-size:13px; }
+  .task.candidate { border-style:dashed; }
+  .task.done .t { text-decoration:line-through; color:var(--mute); }
+  .task .t { flex:1; min-width:0; }
+  .task .k { font-size:11px; color:var(--mute); flex:none; }
+  .task .d { font-size:11px; color:var(--accent); }
+  .task button { padding:1px 7px; font-size:12px; flex:none; }
+  .task button.x { background:transparent; color:var(--mute); }
+  .xstate { font-size:12px; color:var(--mute); align-self:center; }
+  .closed { font-size:11px; margin-left:6px; color:#b45309; }
   .link { margin-top:6px; padding:2px 8px; font-size:12px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; cursor:pointer; }
 </style>
 </head>
@@ -70,6 +81,7 @@
 <div class="switch" id="sw" hidden>
   <label><input type="checkbox" id="swBox"> Claude 켜기 (정제 · 초안 API 호출)</label>
   <span class="note" id="swNote"></span>
+  <button id="reset" class="link" style="margin:0 0 0 auto; flex:none">대화 내용 모두 지우기</button>
 </div>
 <div class="grid" id="grid"></div>
 
@@ -91,6 +103,7 @@ function panel(title, defaultLogin) {
     </div>
     <div class="err"></div>
     <div class="who"></div>
+    <div class="row"><select class="conv" hidden></select></div>
     <div class="msgs"><div class="empty">로그인하면 대화가 보입니다</div></div>
     <div class="suggest" hidden></div>
     <div class="row">
@@ -103,6 +116,8 @@ function panel(title, defaultLogin) {
         <button class="draft">메모로 초안 쓰기</button>
       </div>
       <ul class="checks reply-checks"></ul>
+      <div class="row"><button class="close">대화 닫기 · 할 일 뽑기</button><span class="xstate"></span></div>
+      <div class="tasks"></div>
       <details>
         <summary>공지 초안 만들기</summary>
         <div class="row"><textarea class="points" rows="3" placeholder="공지 요점 (예: 11/14 현장학습, 9시 운동장, 도시락 · 물)"></textarea></div>
@@ -243,6 +258,9 @@ function panel(title, defaultLogin) {
     busy = true;
     try {
       const list = await api(`/conversations/${convId}/messages`);
+      const conv = await api(`/conversations/${convId}`);
+      showConv(conv);
+      if (me.role === "teacher") await renderTasks(conv);
       checkDing(list);
       const box = q(".msgs");
       const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
@@ -266,7 +284,13 @@ function panel(title, defaultLogin) {
       convId = convs[0].id;
       // 내 id 는 첫 대화의 teacher_id/parent_id 로 알아냄
       me.id = res.role === "teacher" ? convs[0].teacher_id : convs[0].parent_id;
-      q(".who").textContent = `${res.name} (${res.role}) · 대화 #${convId} · 학생 ${convs[0].student_name}`;
+      const sel = q(".conv");
+      sel.innerHTML = "";
+      for (const c of convs) sel.appendChild(new Option(`대화 #${c.id} · 학생 ${c.student_name}`, c.id));
+      sel.hidden = convs.length < 2;
+      sel.onchange = () => { convId = +sel.value; seen = null; suggestKey = ""; q(".reply-checks").innerHTML = ""; refresh(); };
+      q(".who").textContent = `${res.name} (${res.role})`;
+      q(".who").appendChild(mk("span", "closed"));
       q(".who").appendChild(mk("span", "live"));
       q(".text").disabled = q(".send").disabled = false;
       q(".tools").hidden = res.role !== "teacher";
@@ -296,6 +320,56 @@ function panel(title, defaultLogin) {
   q(".send").onclick = send;
   q(".text").addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+
+  // 대화 닫기 → 서버가 할 일 · 일정 후보를 뽑는다 (닫힌 대화에 누가 글을 보내면 다시 열림)
+  function showConv(conv) {
+    const closed = conv.status === "closed";
+    q(".closed").textContent = closed ? "· 닫힌 대화 (글을 보내면 다시 열림)" : "";
+    if (me.role !== "teacher") return;
+    const x = conv.extract || {}, b = q(".close"), st = q(".xstate");
+    b.disabled = closed && x.status === "pending";
+    b.textContent = closed ? "다시 뽑기" : "대화 닫기 · 할 일 뽑기";
+    b.onclick = async () => {
+      b.disabled = true; q(".err").textContent = "";
+      try { await api(`/conversations/${convId}/${closed ? "extract" : "close"}`, { method: "POST" }); } catch (e) { q(".err").textContent = e.message; }
+      refresh();
+    };
+    st.textContent = !closed ? "" : x.status === "pending" ? "할 일 · 일정 뽑는 중…"
+      : x.status === "failed" ? "뽑지 못했습니다: " + x.error : x.status === "done" ? `후보 ${x.count}개` : "";
+    st.style.color = x.status === "failed" ? "#dc2626" : "";
+  }
+
+  const KIND_KO = { todo: "할 일", event: "일정" };
+  function due(t) {
+    if (!t.due_at) return t.due_text ? `${t.due_text} (날짜 미정)` : "";
+    const d = new Date(t.due_at);
+    const hm = d.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
+    const day = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short", timeZone: "Asia/Seoul" });
+    const midnight = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }) === "00:00";
+    return day + (midnight ? "" : " " + hm) + (t.due_text ? ` · 「${t.due_text}」` : "");
+  }
+  async function renderTasks(conv) {
+    const box = q(".tasks");
+    const [todos, events] = await Promise.all([
+      api(`/todos?conversation_id=${conv.id}`), api(`/events?conversation_id=${conv.id}`)]);
+    box.innerHTML = "";
+    for (const t of [...events, ...todos]) {
+      const row = mk("div", "task " + t.status);
+      row.appendChild(mk("span", "k", KIND_KO[t.kind] + (t.status === "candidate" ? " 후보" : "")));
+      const body = mk("span", "t", t.title);
+      const dd = due(t);
+      if (dd) { body.appendChild(document.createElement("br")); body.appendChild(mk("span", "d", dd)); }
+      row.appendChild(body);
+      const path = `/${t.kind === "todo" ? "todos" : "events"}/${t.id}`;
+      const act = async (opt) => { try { await api(path, opt); } catch (e) { q(".err").textContent = e.message; } refresh(); };
+      if (t.status === "candidate") { const b = mk("button", "", "추가"); b.onclick = () => act({ method: "PATCH", body: JSON.stringify({ status: "added" }) }); row.appendChild(b); }
+      if (t.status === "added") { const b = mk("button", "", "완료"); b.onclick = () => act({ method: "PATCH", body: JSON.stringify({ status: "done" }) }); row.appendChild(b); }
+      const x = mk("button", "x", "×"); x.title = "지우기";
+      x.onclick = async () => { try { await fetch(API + path, { method: "DELETE", headers: { Authorization: "Bearer " + token } }); } catch (e) {} refresh(); };
+      row.appendChild(x);
+      box.appendChild(row);
+    }
+  }
 
   function showChecks(ul, items) {
     ul.innerHTML = "";
@@ -337,6 +411,14 @@ function showSwitch(on) {
   swNote.textContent = on ? "켜짐 — 학부모 메시지마다, 초안 버튼을 누를 때마다 Claude 를 부릅니다 (건당 약 $0.006)" : "꺼짐 — API 를 안 부릅니다. 보낸 메시지는 「정제하지 못했습니다」로 남고(켠 뒤 「다시 정제」), 초안 버튼은 오류가 납니다";
 }
 fetch(API + "/dev/refine").then(r => r.ok ? r.json() : null).then(d => { if (d) { sw.hidden = false; showSwitch(d.enabled); } }).catch(() => {});
+// 시험용 초기화: 메시지 · 할 일 · 일정을 모두 지우고 대화를 다시 연다 (계정 · 대화 · 스위치는 그대로)
+document.getElementById("reset").onclick = async () => {
+  if (!confirm("모든 대화의 메시지와 할 일 · 일정을 지웁니다. 계속할까요?")) return;
+  try {
+    const r = await fetch(API + "/dev/reset", { method: "POST" });
+    if (!r.ok) throw new Error(r.status);
+  } catch (e) { swNote.textContent = "초기화 오류: " + e.message; }
+};
 swBox.onchange = async () => {
   try {
     const r = await fetch(API + "/dev/refine", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: swBox.checked }) });

@@ -72,17 +72,13 @@ def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
         drafts.auto_draft(msg_id, conv_id)
 
 
-@router.get("/conversations")
-def my_conversations(db: Session = Depends(get_db), user=Depends(current_user)):
-    return [dict(c) for c in crud.list_conversations(db, user["id"])]
-
-
 @router.post("/conversations/{conv_id}/messages", response_model=MessageOut, status_code=201)
 def send_message(conv_id: int, body: MessageIn, background: BackgroundTasks,
                  db: Session = Depends(get_db), user=Depends(current_user)):
     _my_conversation(db, conv_id, user)
     # 학부모 메시지는 정제 대기(pending) → 백그라운드에서 정제, 교사 메시지는 그대로(skip)
     status = "pending" if user["role"] == "parent" else "skip"
+    crud.reopen_if_closed(db, conv_id)  # 닫힌 대화에 새 글이 오면 다시 연다 (뽑아 둔 할 일 · 일정은 그대로)
     msg = crud.add_message(db, conv_id, user["id"], body.text, status)
     hub.notify_conversation(conv_id)
     if status == "pending":
@@ -138,3 +134,14 @@ def dev_refine_set(body: RefineSwitch):
     _refine_state["enabled"] = body.enabled
     log.info("정제 %s", "켬" if body.enabled else "끔")
     return {"enabled": _refine_state["enabled"]}
+
+
+@router.post("/dev/reset")
+def dev_reset(db: Session = Depends(get_db)):
+    """시험용 초기화: 모든 대화의 메시지 · 할 일 · 일정을 지우고 대화를 다시 연다 (계정 · 대화는 둔다)."""
+    _need_dev_tools()
+    conv_ids = crud.dev_reset(db)
+    log.info("시험용 초기화: 대화 %d개 비움", len(conv_ids))
+    for cid in conv_ids:
+        hub.notify_conversation(cid)  # 열려 있는 화면들이 바로 비워진다
+    return {"conversations": len(conv_ids)}

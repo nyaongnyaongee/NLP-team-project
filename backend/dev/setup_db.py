@@ -43,6 +43,21 @@ def main():
         raw.commit()
         raw.close()
         print("테이블 만듦 (users · conversations · messages · tasks)")
+    else:
+        _upgrade(eng)
+
+
+# schema.sql 이 바뀐 뒤에도 예전에 만든 DB 를 지우지 않고 쓰게, 빠진 열만 더한다 (여러 번 돌려도 같음)
+UPGRADES = [
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS extract JSONB",                         # C 추출 상태
+    "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
+]
+
+
+def _upgrade(eng):
+    with eng.begin() as c:
+        for sql in UPGRADES:
+            c.execute(text(sql))
 
 
 if __name__ == "__main__":
