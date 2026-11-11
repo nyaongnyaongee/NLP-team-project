@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["todo", "event"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "due_text": {
+            "anyOf": [{"type": "string"}, {"type": "null"}]
+          },
+          "date": {
+            "anyOf": [{"type": "string"}, {"type": "null"}]
+          },
+          "time": {
+            "anyOf": [{"type": "string"}, {"type": "null"}]
+          }
+        },
+        "required": ["kind", "title", "due_text", "date", "time"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["tasks"],
+  "additionalProperties": false
+}

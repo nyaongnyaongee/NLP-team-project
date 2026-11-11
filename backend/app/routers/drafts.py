@@ -52,15 +52,16 @@ def _need_claude():
         raise HTTPException(503, "Claude 가 꺼져 있습니다 (시험용 스위치)")
 
 
-def _history(msgs, parent_id: int) -> list[dict]:
-    """교사가 볼 수 있는 글만: 교사 글은 그대로, 학부모 글은 정제된(done) 것의 정제문. 정제 안 된 학부모 글은 뺀다."""
+def _history(msgs, parent_id: int, limit: int = HISTORY_LIMIT) -> list[dict]:
+    """교사가 볼 수 있는 글만: 교사 글은 그대로, 학부모 글은 정제된(done) 것의 정제문. 정제 안 된 학부모 글은 뺀다.
+    추출(C)도 같이 쓴다 (at = 보낸 시각, 「내일」을 날짜로 바꿀 때)."""
     out = []
     for m in msgs:
         if m["status"] == "skip":
-            out.append({"who": "teacher", "text": m["raw_text"]})
+            out.append({"who": "teacher", "text": m["raw_text"], "at": m["created_at"]})
         elif m["status"] == "done" and m["sender_id"] == parent_id:
-            out.append({"who": "parent", "text": m["refined_text"]})
-    return out[-HISTORY_LIMIT:]
+            out.append({"who": "parent", "text": m["refined_text"], "at": m["created_at"]})
+    return out[-limit:]
 
 
 def auto_draft(msg_id: int, conv_id: int) -> None:

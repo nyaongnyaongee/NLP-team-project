@@ -18,6 +18,7 @@ CREATE TABLE conversations (
   status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),  -- closed → C 추출
   report       JSONB,                       -- 신고 보고서. NULL 이면 신고 안 함
   reported_at  TIMESTAMPTZ,                 -- 민원대응팀 화면 = 이 값이 있는 대화
+  extract      JSONB,                       -- 할 일 · 일정 추출(C) 상태: {"status": "pending|done|failed", "error", "count", "at"}. NULL = 닫은 적 없음
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -40,10 +41,12 @@ CREATE TABLE tasks (
   conversation_id BIGINT NOT NULL REFERENCES conversations(id),
   kind            TEXT NOT NULL CHECK (kind IN ('todo', 'event')),
   title           TEXT NOT NULL,
-  due_text        TEXT,                     -- 원문 표현 그대로 (예: '이번 주 금요일까지')
-  due_at          TIMESTAMPTZ,              -- 코드가 받은 날 기준으로 바꾼 날짜
+  due_text        TEXT,                     -- 대화에 적힌 표현 그대로 (예: '이번 주 금요일까지')
+  due_at          TIMESTAMPTZ,              -- 그 표현을 메시지 보낸 날 기준으로 바꾼 날짜 (Claude 가 계산, 코드가 범위 점검).
+                                            -- 시각이 없으면 그날 00:00 (한국 시각)
   status          TEXT NOT NULL DEFAULT 'candidate'
-                  CHECK (status IN ('candidate', 'added', 'done'))  -- 후보 → [추가] → 완료
+                  CHECK (status IN ('candidate', 'added', 'done')),  -- 후보 → [추가] → 완료. 후보를 지우면 행 삭제
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- messages.analysis 예시 (확정 아님, 프롬프트에 따라 바뀜)
