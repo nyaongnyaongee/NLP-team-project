@@ -69,6 +69,16 @@ class Hub:
         except Exception:
             log.exception("알림 보내기 실패 (대화 %s)", conv_id)
 
+    def notify_users(self, user_ids: list[int], data: dict) -> None:
+        """특정 사람들에게 알림 (공지 등). 내용은 싣지 않고 종류 · 번호만 — 화면이 GET 으로 다시 읽는다."""
+        loop = self.loop
+        if loop is None or not self.conns or loop.is_closed():
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self._send(list(user_ids), data), loop)
+        except Exception:
+            log.exception("알림 보내기 실패 (%s)", data.get("type"))
+
 
 hub = Hub()
 

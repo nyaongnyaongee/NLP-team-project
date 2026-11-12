@@ -162,10 +162,11 @@ def dev_refine_set(body: RefineSwitch):
 
 @router.post("/dev/reset")
 def dev_reset(db: Session = Depends(get_db)):
-    """시험용 초기화: 모든 대화의 메시지 · 할 일 · 일정을 지우고 대화를 다시 연다 (계정 · 대화는 둔다)."""
+    """시험용 초기화: 모든 대화의 메시지 · 할 일 · 일정 · 공지를 지우고 대화를 다시 연다 (계정 · 대화는 둔다)."""
     _need_dev_tools()
     conv_ids = crud.dev_reset(db)
     log.info("시험용 초기화: 대화 %d개 비움", len(conv_ids))
     for cid in conv_ids:
         hub.notify_conversation(cid)  # 열려 있는 화면들이 바로 비워진다
+    hub.notify_users(list(hub.conns), {"type": "notice", "notice_id": None})  # 공지 목록도
     return {"conversations": len(conv_ids)}

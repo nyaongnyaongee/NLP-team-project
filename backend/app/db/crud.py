@@ -191,11 +191,78 @@ def delete_task(db: Session, task_id: int) -> None:
     db.commit()
 
 
+# ---- 공지
+
+def create_notice(db: Session, teacher_id: int, title: str, body: str):
+    row = db.execute(
+        text("INSERT INTO notices (teacher_id, title, body) VALUES (:t, :ti, :b) RETURNING *"),
+        {"t": teacher_id, "ti": title, "b": body},
+    ).mappings().first()
+    db.commit()
+    return row
+
+
+def get_notice(db: Session, notice_id: int):
+    return db.execute(text("SELECT * FROM notices WHERE id = :i"), {"i": notice_id}).mappings().first()
+
+
+def list_teacher_notices(db: Session, teacher_id: int):
+    """교사 자기 공지 전부. 쓰는 중(draft) 먼저, 그다음 최근 것부터."""
+    return db.execute(
+        text("SELECT * FROM notices WHERE teacher_id = :t "
+             "ORDER BY status = 'sent', COALESCE(sent_at, updated_at) DESC, id DESC"),
+        {"t": teacher_id},
+    ).mappings().all()
+
+
+def list_parent_notices(db: Session, parent_id: int):
+    """학부모가 받는 공지: 대화가 있는 교사가 보낸 것만, 최근 것부터."""
+    return db.execute(
+        text("SELECT * FROM notices WHERE status = 'sent' "
+             "AND teacher_id IN (SELECT teacher_id FROM conversations WHERE parent_id = :p) "
+             "ORDER BY sent_at DESC, id DESC"),
+        {"p": parent_id},
+    ).mappings().all()
+
+
+def update_notice(db: Session, notice_id: int, fields: dict) -> bool:
+    """쓰는 중인 공지만 고친다. 이미 보냈으면 False."""
+    if not fields:
+        return True
+    sets = ", ".join(f"{k} = :{k}" for k in fields)
+    n = db.execute(text(f"UPDATE notices SET {sets}, updated_at = now() WHERE id = :i AND status = 'draft'"),
+                   {**fields, "i": notice_id}).rowcount
+    db.commit()
+    return n == 1
+
+
+def send_notice(db: Session, notice_id: int) -> bool:
+    """draft → sent. 동시에 두 번 눌러도 한 번만 보낸다 (이미 보냈으면 False)."""
+    n = db.execute(text("UPDATE notices SET status = 'sent', sent_at = now() WHERE id = :i AND status = 'draft'"),
+                   {"i": notice_id}).rowcount
+    db.commit()
+    return n == 1
+
+
+def delete_notice(db: Session, notice_id: int) -> bool:
+    """쓰는 중인 공지만 지운다. 이미 보냈으면 False."""
+    n = db.execute(text("DELETE FROM notices WHERE id = :i AND status = 'draft'"), {"i": notice_id}).rowcount
+    db.commit()
+    return n == 1
+
+
+def notice_recipients(db: Session, teacher_id: int) -> list[int]:
+    """공지를 받는 학부모 id (그 교사와 대화가 있는 사람)."""
+    return [r[0] for r in db.execute(
+        text("SELECT DISTINCT parent_id FROM conversations WHERE teacher_id = :t ORDER BY parent_id"), {"t": teacher_id},
+    ).all()]
+
+
 # ---- 시험용 초기화 (/dev/reset)
 
 def dev_reset(db: Session) -> list[int]:
-    """메시지 · 할 일/일정을 모두 지우고 대화를 처음 상태(열림, 추출 없음)로. 계정 · 대화 자체는 둔다. 대화 id 목록을 돌려준다."""
-    db.execute(text("TRUNCATE messages, tasks RESTART IDENTITY"))
+    """메시지 · 할 일/일정 · 공지를 모두 지우고 대화를 처음 상태(열림, 추출 없음)로. 계정 · 대화 자체는 둔다. 대화 id 목록을 돌려준다."""
+    db.execute(text("TRUNCATE messages, tasks, notices RESTART IDENTITY"))
     db.execute(text("UPDATE conversations SET status = 'open', extract = NULL, report = NULL, reported_at = NULL"))
     ids = [r[0] for r in db.execute(text("SELECT id FROM conversations ORDER BY id")).all()]
     db.commit()

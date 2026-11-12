@@ -42,7 +42,7 @@ def main():
         raw.cursor().execute(SCHEMA.read_text(encoding="utf-8"))
         raw.commit()
         raw.close()
-        print("테이블 만듦 (users · conversations · messages · tasks)")
+        print("테이블 만듦 (users · conversations · messages · tasks · notices)")
     else:
         _upgrade(eng)
 
@@ -52,6 +52,17 @@ UPGRADES = [
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS extract JSONB",                         # C 추출 상태
     "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS needs_refinement BOOLEAN",                   # 정제 여부 (원문 통과)
+    # 공지 테이블 (schema.sql 의 것과 같게)
+    """CREATE TABLE IF NOT EXISTS notices (
+      id         BIGSERIAL PRIMARY KEY,
+      teacher_id BIGINT NOT NULL REFERENCES users(id),
+      title      TEXT NOT NULL,
+      body       TEXT NOT NULL,
+      status     TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      sent_at    TIMESTAMPTZ
+    )""",
 ]
 
 
