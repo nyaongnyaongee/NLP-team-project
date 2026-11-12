@@ -4,6 +4,9 @@
     "abusive": {
       "type": "boolean"
     },
+    "needs_refinement": {
+      "type": "boolean"
+    },
     "quotes": {
       "type": "array",
       "items": {
@@ -95,6 +98,7 @@
   },
   "required": [
     "abusive",
+    "needs_refinement",
     "quotes",
     "topic",
     "requests",
