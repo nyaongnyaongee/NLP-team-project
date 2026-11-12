@@ -78,8 +78,8 @@ def test_학부모가_보내면_응답은_pending_이고_곧_정제문이_저장
     assert len(seen) == 1 and "지민" not in seen[0] and "김민지" not in seen[0]
 
 
-def test_명시적_통과는_원문만_교사에게_보이고_AI_문장과_인용을_저장하지_않는다(client, auth, ids, engine, refine_with):
-    refine_with(lambda m: reply({**good(m), "needs_refinement": False}))
+def test_명시적_통과는_원문과_분석이_교사에게_보이고_정제문은_저장하지_않는다(client, auth, ids, engine, refine_with):
+    refine_with(lambda m: reply({**good(m), "abusive": False, "quotes": [], "needs_refinement": False}))
     conv = ids["conv_parent1"]
     sent = send(client, auth, "parent1", conv, RAW).json()
     assert sent["status"] == "pending" and sent["raw_text"] == RAW
@@ -87,11 +87,14 @@ def test_명시적_통과는_원문만_교사에게_보이고_AI_문장과_인�
     teacher = read(client, auth, "teacher1", conv)[0]
     assert teacher["status"] == "done"
     assert teacher["raw_text"] == RAW
-    assert teacher["refined_text"] is None and teacher["analysis"] is None
+    assert teacher["refined_text"] is None
+    assert teacher["analysis"]["needs_refinement"] is False and "topic" in teacher["analysis"]
+    assert "quotes" not in teacher["analysis"]
     with engine.connect() as c:
         row = c.execute(text("SELECT raw_text, refined_text, analysis, status FROM messages WHERE id = :i"),
                         {"i": sent["id"]}).one()
-    assert row == (RAW, None, {"needs_refinement": False}, "done")
+    assert row[0] == RAW and row[1] is None and row[3] == "done"
+    assert row[2]["needs_refinement"] is False and "requests" in row[2]
     parent = read(client, auth, "parent1", conv)[0]
     assert parent["raw_text"] == RAW and parent["refined_text"] is None and parent["analysis"] is None
 
@@ -101,13 +104,23 @@ def test_최상위_판정값_false도_원문_통과로_처리한다(client, auth
     monkeypatch.setitem(router_mod._refine_state, "enabled", True)
     monkeypatch.setattr(router_mod, "refine_message", lambda *a: {
         "status": "done", "needs_refinement": False, "refined_text": "버려야 할 정제문",
-        "analysis": {"quotes": [RAW], "topic": "버려야 할 분석"}, "error": None,
+        "analysis": {"abusive": False, "quotes": [], "topic": "기타"}, "error": None,
     })
     send(client, auth, "parent1", ids["conv_parent1"], RAW)
     teacher = read(client, auth, "teacher1", ids["conv_parent1"])[0]
     assert teacher["raw_text"] == RAW and teacher["refined_text"] is None
     with engine.connect() as c:
-        assert c.execute(text("SELECT analysis FROM messages")).scalar() == {"needs_refinement": False}
+        assert c.execute(text("SELECT analysis FROM messages")).scalar() == {
+            "abusive": False, "quotes": [], "topic": "기타", "needs_refinement": False}
+
+
+def test_통과_판정이어도_abusive_면_정제문을_보인다(client, auth, ids, engine, refine_with):
+    refine_with(lambda m: reply({**good(m), "abusive": True, "needs_refinement": False}))
+    send(client, auth, "parent1", ids["conv_parent1"], RAW)
+    teacher = read(client, auth, "teacher1", ids["conv_parent1"])[0]
+    assert teacher["status"] == "done" and teacher["raw_text"] is None
+    assert teacher["refined_text"] and "무능하네요" not in teacher["refined_text"]
+    assert teacher["analysis"]["needs_refinement"] is True
 
 
 def test_명시적_정제는_정제문만_교사에게_보인다(client, auth, ids, refine_with):

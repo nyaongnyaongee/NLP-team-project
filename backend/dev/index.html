@@ -139,11 +139,10 @@ function panel(title, defaultLogin) {
     return m.refined_text ?? m.raw_text ?? null;
   }
 
+  // 정제됐는지 원문 그대로인지는 교사에게 드러내지 않는다
   function statusLabel(m) {
-    if (m.status === "done") {
-      if (me.role !== "teacher" || m.sender_id === me.id) return "처리 완료";
-      return m.refined_text != null ? "정제됨" : m.raw_text != null ? "원문 전달됨" : "처리 완료";
-    }
+    return m.status === "done" ? "" : (STATUS_KO[m.status] || "");
+  }
     return STATUS_KO[m.status] || "";
   }
 
@@ -156,7 +155,7 @@ function panel(title, defaultLogin) {
 
   function renderMsg(m) {
     const d = mk("div", "m" + (m.sender_id === me.id ? " me" : ""));
-    // 교사 화면: 완료된 학부모 글은 정제문이 있으면 정제문, 명시적 통과로 받은 원문이면 원문을 보여 준다.
+    // 교사 화면: 완료된 학부모 글은 정제문이 있으면 정제문, 통과한 글이면 원문. 어느 쪽인지는 표시하지 않는다
     const refinedView = me.role === "teacher" && m.status !== "skip";
     if (!refinedView) {
       d.appendChild(mk("div", "", m.raw_text));
@@ -194,7 +193,7 @@ function panel(title, defaultLogin) {
         const prev = seen.get(m.id);
         const text = teacherMessageText(m);
         if (me.role === "teacher" && m.status === "done" && prev !== "done" && text != null)
-          ding(`${me.name} 선생님 · 새 메시지 (${statusLabel(m)})`, text);
+          ding(`${me.name} 선생님 · 새 메시지`, text);
         if (me.role !== "teacher" && m.status === "skip" && prev === undefined) ding(`${me.name} · 선생님 답장`, m.raw_text);
       }
     }

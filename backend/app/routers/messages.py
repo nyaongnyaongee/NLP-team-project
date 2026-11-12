@@ -30,16 +30,14 @@ def _my_conversation(db: Session, conv_id: int, user):
 def _view(msg, user) -> dict:
     """보는 사람에 맞게 걸러서 돌려준다.
     - 교사가 보낸 글(skip): 양쪽 모두 있는 그대로
-    - 학부모 글을 교사가 볼 때: 명시적으로 통과한 글은 원문, 그 외 완료된 글은 정제문
+    - 학부모 글을 교사가 볼 때: 명시적으로 통과한 글은 원문, 그 외 완료된 글은 정제문. 분석은 둘 다 주되 인용문(quotes)은 뺌
     - 학부모가 자기 글을 볼 때: 자기가 쓴 원문만 (정제문 · 분석은 교사용이라 뺌)"""
     d = dict(msg)
     if d["status"] == "skip":
         return d
     if user["role"] == "teacher":
-        if _is_passthrough(d):
-            d["analysis"] = None
-            return d
-        d["raw_text"] = None
+        if not _is_passthrough(d):
+            d["raw_text"] = None
         if d.get("analysis"):
             d["analysis"] = {k: v for k, v in d["analysis"].items() if k != "quotes"}
     else:
@@ -57,14 +55,18 @@ def _is_passthrough(msg) -> bool:
 
 def _result_for_storage(result: dict) -> dict:
     """최상위 판정을 우선하며, 현재 AI 결과의 analysis 안에 실린 판정도 받는다.
-    통과 판정이면 AI가 만든 문장과 인용 분석을 버리고 판정만 남긴다."""
+    통과 판정이면 정제문만 버리고 분석(주제 · 요청 · 위협 · 시한)은 남긴다.
+    통과인데 abusive 가 true 면 판정끼리 어긋난 것이라 정제문 쪽으로 처리한다 (거친 원문이 교사에게 가지 않게)."""
     if result["status"] != "done":
         return result
-    decision = result.get("needs_refinement") if "needs_refinement" in result else None
-    if "needs_refinement" not in result and isinstance(result.get("analysis"), dict):
-        decision = result["analysis"].get("needs_refinement")
+    analysis = dict(result["analysis"]) if isinstance(result.get("analysis"), dict) else {}
+    decision = result["needs_refinement"] if "needs_refinement" in result else analysis.get("needs_refinement")
+    if decision is False and not analysis.get("abusive"):
+        return {"status": "done", "refined_text": None, "analysis": {**analysis, "needs_refinement": False},
+                "error": None}
     if decision is False:
-        return {"status": "done", "refined_text": None, "analysis": {"needs_refinement": False}}
+        log.warning("통과 판정인데 abusive=true → 정제문으로 처리")
+        result = {**result, "analysis": {**analysis, "needs_refinement": True}}
     if not isinstance(result.get("refined_text"), str) or not result["refined_text"]:
         return {"status": "failed", "refined_text": None, "analysis": None,
                 "error": "정제 결과에 정제문이 없습니다"}
