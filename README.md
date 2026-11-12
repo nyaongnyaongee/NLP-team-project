@@ -40,7 +40,7 @@ py -3.12 -m venv .venv
 copy .env.example .env
 ```
 
-`backend\.env` 를 메모장으로 열어 **두 값을 채운다** (저장할 때 인코딩은 UTF-8).
+`backend\.env` 를 메모장으로 열어( 명령어 : notepad .env ) **두 값을 채운다** (저장할 때 인코딩은 UTF-8).
 - `DATABASE_URL` — `.env.example` 의 Windows 예시 줄을 쓰고, `비밀번호` 자리에 1번에서 정한 비밀번호
 - `JWT_SECRET` — 아래 명령이 찍어 주는 긴 문자열을 붙여 넣기
   ```powershell
