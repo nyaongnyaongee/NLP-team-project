@@ -143,8 +143,6 @@ function panel(title, defaultLogin) {
   function statusLabel(m) {
     return m.status === "done" ? "" : (STATUS_KO[m.status] || "");
   }
-    return STATUS_KO[m.status] || "";
-  }
 
   function mk(tag, cls, text) {
     const e = document.createElement(tag);
