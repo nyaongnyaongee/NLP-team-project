@@ -64,8 +64,8 @@ def test_통과한_원문과_정제문을_초안_문맥에_넣고_초안은_저�
     conv = ids["conv_parent1"]
     with engine.begin() as c:
         passed = c.execute(text(
-            "INSERT INTO messages (conversation_id, sender_id, raw_text, analysis, status) "
-            "VALUES (:c, :s, :r, '{\"needs_refinement\": false}'::jsonb, 'done') RETURNING id"
+            "INSERT INTO messages (conversation_id, sender_id, raw_text, analysis, needs_refinement, status) "
+            "VALUES (:c, :s, :r, '{}'::jsonb, false, 'done') RETURNING id"
         ), {"c": conv, "s": ids["parent1"], "r": "체육 시간에 넘어졌어요."}).scalar()
         refined = c.execute(text(
             "INSERT INTO messages (conversation_id, sender_id, raw_text, refined_text, analysis, status) "
@@ -82,7 +82,7 @@ def test_통과한_원문과_정제문을_초안_문맥에_넣고_초안은_저�
     with engine.connect() as c:
         rows = c.execute(text("SELECT id, analysis FROM messages WHERE id IN (:p, :r) ORDER BY id"),
                          {"p": passed, "r": refined}).all()
-    assert rows == [(passed, {"needs_refinement": False}), (refined, {})]
+    assert rows == [(passed, {}), (refined, {})]
 
 
 def test_판정_없이_완료됐으나_정제문이_없으면_초안_문맥에서_제외한다(client, auth, ids, engine, claude):

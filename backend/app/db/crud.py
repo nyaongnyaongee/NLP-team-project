@@ -51,7 +51,8 @@ def get_message(db: Session, msg_id: int):
 def set_message_pending(db: Session, msg_id: int):
     """「다시 정제」: 이전 결과를 지우고 정제 대기로 되돌린다."""
     row = db.execute(
-        text("UPDATE messages SET status = 'pending', refined_text = NULL, analysis = NULL WHERE id = :i RETURNING *"),
+        text("UPDATE messages SET status = 'pending', refined_text = NULL, analysis = NULL, needs_refinement = NULL "
+             "WHERE id = :i RETURNING *"),
         {"i": msg_id},
     ).mappings().first()
     db.commit()
@@ -59,14 +60,17 @@ def set_message_pending(db: Session, msg_id: int):
 
 
 def save_refine_result(db: Session, msg_id: int, result: dict) -> None:
-    """refine_message 의 반환값을 저장. 실패하면 analysis 에 {"error": 사유} 를 넣는다 (사유에는 원문이 없다)."""
+    """refine_message 의 반환값을 저장. 실패하면 analysis 에 {"error": 사유} 를 넣는다 (사유에는 원문이 없다).
+    needs_refinement: true = 정제문, false = 원문 통과, 실패면 NULL."""
     failed = result["status"] != "done"
     analysis = {"error": result["error"]} if failed else result["analysis"]
     db.execute(
         text(
-            "UPDATE messages SET status = :st, refined_text = :rt, analysis = CAST(:an AS JSONB) WHERE id = :i"
+            "UPDATE messages SET status = :st, refined_text = :rt, analysis = CAST(:an AS JSONB), "
+            "needs_refinement = :nr WHERE id = :i"
         ),
         {"st": "failed" if failed else "done", "rt": result["refined_text"],
+         "nr": None if failed else result.get("needs_refinement"),
          "an": json.dumps(analysis, ensure_ascii=False), "i": msg_id},
     )
     db.commit()

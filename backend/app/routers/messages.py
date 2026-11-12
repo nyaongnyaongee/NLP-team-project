@@ -47,26 +47,26 @@ def _view(msg, user) -> dict:
 
 
 def _is_passthrough(msg) -> bool:
-    """완료 상태와 저장된 명시적 판정이 모두 있어야 원문을 보여 준다."""
-    analysis = msg.get("analysis")
-    return (msg["status"] == "done" and msg.get("refined_text") is None
-            and isinstance(analysis, dict) and analysis.get("needs_refinement") is False)
+    """완료 상태이고 정제 여부(needs_refinement 열)가 명시적으로 false 여야 원문을 보여 준다."""
+    return msg["status"] == "done" and msg.get("refined_text") is None and msg.get("needs_refinement") is False
 
 
 def _result_for_storage(result: dict) -> dict:
     """최상위 판정을 우선하며, 현재 AI 결과의 analysis 안에 실린 판정도 받는다.
+    판정은 analysis 에서 빼서 needs_refinement 열로 저장한다 (교사에게 가는 analysis 에 남지 않게).
     통과 판정이면 정제문만 버리고 분석(주제 · 요청 · 위협 · 시한)은 남긴다.
     통과인데 abusive 가 true 면 판정끼리 어긋난 것이라 정제문 쪽으로 처리한다 (거친 원문이 교사에게 가지 않게)."""
     if result["status"] != "done":
         return result
     analysis = dict(result["analysis"]) if isinstance(result.get("analysis"), dict) else {}
-    decision = result["needs_refinement"] if "needs_refinement" in result else analysis.get("needs_refinement")
+    in_analysis = analysis.pop("needs_refinement", None)
+    decision = result["needs_refinement"] if "needs_refinement" in result else in_analysis
     if decision is False and not analysis.get("abusive"):
-        return {"status": "done", "refined_text": None, "analysis": {**analysis, "needs_refinement": False},
+        return {"status": "done", "refined_text": None, "analysis": analysis, "needs_refinement": False,
                 "error": None}
     if decision is False:
         log.warning("통과 판정인데 abusive=true → 정제문으로 처리")
-        result = {**result, "analysis": {**analysis, "needs_refinement": True}}
+    result = {**result, "analysis": analysis, "needs_refinement": True}
     if not isinstance(result.get("refined_text"), str) or not result["refined_text"]:
         return {"status": "failed", "refined_text": None, "analysis": None,
                 "error": "정제 결과에 정제문이 없습니다"}

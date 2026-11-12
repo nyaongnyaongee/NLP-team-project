@@ -28,7 +28,9 @@ CREATE TABLE messages (
   conversation_id BIGINT NOT NULL REFERENCES conversations(id),
   sender_id       BIGINT NOT NULL REFERENCES users(id),
   raw_text        TEXT NOT NULL,            -- 원문 (가명처리 전 그대로). 교사에게는 API · 화면으로 안 줌, 법적 확인 때 DB 에서만 본다
-  refined_text    TEXT,                     -- 정제문 (교사 메시지는 NULL)
+  refined_text    TEXT,                     -- 정제문 (교사 메시지 · 원문 통과는 NULL)
+  needs_refinement BOOLEAN,                 -- 정제 여부: true = 정제함(교사는 정제문), false = 원문 통과(교사는 원문),
+                                            -- NULL = 처리 전 · 실패 · 교사 메시지. 교사에게는 이 값을 주지 않는다
   analysis        JSONB,                    -- Claude 분석 결과. 필드가 바뀌어도 테이블은 안 고침
   status          TEXT NOT NULL DEFAULT 'pending'
                   CHECK (status IN ('pending', 'done', 'failed', 'skip')),  -- skip = 교사 메시지
