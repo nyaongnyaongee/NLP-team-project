@@ -1,4 +1,4 @@
--- 이음 시연용 DB 테이블 (PostgreSQL) — 4개
+-- 이음 시연용 DB 테이블 (PostgreSQL) — 5개
 
 -- 사용자: 학부모 · 교사 · 민원대응팀
 CREATE TABLE users (
@@ -49,6 +49,19 @@ CREATE TABLE tasks (
   status          TEXT NOT NULL DEFAULT 'candidate'
                   CHECK (status IN ('candidate', 'added', 'done')),  -- 후보 → [추가] → 완료. 후보를 지우면 행 삭제
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 공지: 교사가 쓰고(draft) [보내기] 하면 sent. 받는 사람 = 그 교사와 대화가 있는 학부모 전부 (반 테이블이 없어서)
+-- 보낸 공지는 고치거나 지울 수 없다
+CREATE TABLE notices (
+  id         BIGSERIAL PRIMARY KEY,
+  teacher_id BIGINT NOT NULL REFERENCES users(id),
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_at    TIMESTAMPTZ
 );
 
 -- messages.analysis 예시 (확정 아님, 프롬프트에 따라 바뀜)
