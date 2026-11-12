@@ -51,6 +51,7 @@ def main():
 UPGRADES = [
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS extract JSONB",                         # C 추출 상태
     "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS needs_refinement BOOLEAN",                   # 정제 여부 (원문 통과)
 ]
 
 

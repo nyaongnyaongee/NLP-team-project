@@ -28,21 +28,49 @@ def _my_conversation(db: Session, conv_id: int, user):
 
 
 def _view(msg, user) -> dict:
-    """보는 사람에 맞게 걸러서 돌려준다.  원문(raw_text)과 원문 인용은 DB 에만 있고 화면 · API 로는 안 나간다.
+    """보는 사람에 맞게 걸러서 돌려준다.
     - 교사가 보낸 글(skip): 양쪽 모두 있는 그대로
-    - 학부모 글을 교사가 볼 때: 정제문 · 분석만 (원문 · 분석 속 인용문 quotes 는 뺌)
+    - 학부모 글을 교사가 볼 때: 명시적으로 통과한 글은 원문, 그 외 완료된 글은 정제문. 분석은 둘 다 주되 인용문(quotes)은 뺌
     - 학부모가 자기 글을 볼 때: 자기가 쓴 원문만 (정제문 · 분석은 교사용이라 뺌)"""
     d = dict(msg)
     if d["status"] == "skip":
         return d
     if user["role"] == "teacher":
-        d["raw_text"] = None
+        if not _is_passthrough(d):
+            d["raw_text"] = None
         if d.get("analysis"):
             d["analysis"] = {k: v for k, v in d["analysis"].items() if k != "quotes"}
     else:
         d["refined_text"] = None
         d["analysis"] = None
     return d
+
+
+def _is_passthrough(msg) -> bool:
+    """완료 상태이고 정제 여부(needs_refinement 열)가 명시적으로 false 여야 원문을 보여 준다."""
+    return msg["status"] == "done" and msg.get("refined_text") is None and msg.get("needs_refinement") is False
+
+
+def _result_for_storage(result: dict) -> dict:
+    """최상위 판정을 우선하며, 현재 AI 결과의 analysis 안에 실린 판정도 받는다.
+    판정은 analysis 에서 빼서 needs_refinement 열로 저장한다 (교사에게 가는 analysis 에 남지 않게).
+    통과 판정이면 정제문만 버리고 분석(주제 · 요청 · 위협 · 시한)은 남긴다.
+    통과인데 abusive 가 true 면 판정끼리 어긋난 것이라 정제문 쪽으로 처리한다 (거친 원문이 교사에게 가지 않게)."""
+    if result["status"] != "done":
+        return result
+    analysis = dict(result["analysis"]) if isinstance(result.get("analysis"), dict) else {}
+    in_analysis = analysis.pop("needs_refinement", None)
+    decision = result["needs_refinement"] if "needs_refinement" in result else in_analysis
+    if decision is False and not analysis.get("abusive"):
+        return {"status": "done", "refined_text": None, "analysis": analysis, "needs_refinement": False,
+                "error": None}
+    if decision is False:
+        log.warning("통과 판정인데 abusive=true → 정제문으로 처리")
+    result = {**result, "analysis": analysis, "needs_refinement": True}
+    if not isinstance(result.get("refined_text"), str) or not result["refined_text"]:
+        return {"status": "failed", "refined_text": None, "analysis": None,
+                "error": "정제 결과에 정제문이 없습니다"}
+    return result
 
 
 def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
@@ -61,15 +89,11 @@ def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
         result = {"status": "failed", "refined_text": None, "analysis": None, "error": f"정제 중 오류 ({type(e).__name__})"}
     try:
         with SessionLocal() as db:
-            crud.save_refine_result(db, msg_id, result)
+            crud.save_refine_result(db, msg_id, _result_for_storage(result))
     except Exception:
         log.exception("정제 결과 저장 실패 (message %s)", msg_id)
         return
-    hub.notify_conversation(conv_id)  # 교사 화면: 정제문(또는 실패 사유)이 뜨고 띵
-    if result["status"] == "done":  # 교사가 정제문을 먼저 보고, 몇 초 뒤 답장 추천이 붙는다
-        from app.routers import drafts  # drafts 가 이 파일을 불러서, 여기서는 늦게 부른다
-
-        drafts.auto_draft(msg_id, conv_id)
+    hub.notify_conversation(conv_id)
 
 
 @router.post("/conversations/{conv_id}/messages", response_model=MessageOut, status_code=201)

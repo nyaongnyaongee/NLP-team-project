@@ -53,13 +53,6 @@
   .checks { margin:4px 0 0; padding-left:18px; color:#b45309; font-size:12px; }
   .out { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; margin-top:6px; }
   button:disabled { opacity:.5; cursor:default; }
-  .suggest { position:relative; margin-bottom:6px; padding:8px 30px 8px 10px; border:1px dashed var(--accent);
-             border-radius:10px; background:var(--card); cursor:pointer; font-size:14px; white-space:pre-wrap; }
-  .suggest:hover { background:var(--me); }
-  .suggest .hint { font-size:11px; color:var(--accent); font-weight:600; margin-bottom:2px; }
-  .suggest.wait { cursor:default; border-style:dotted; color:var(--mute); font-style:italic; }
-  .suggest.wait:hover { background:var(--card); }
-  .suggest .x { position:absolute; top:4px; right:6px; padding:0 6px; background:transparent; color:var(--mute); font-size:16px; }
   .tasks { margin-top:6px; display:flex; flex-direction:column; gap:4px; }
   .task { display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--line); border-radius:8px; font-size:13px; }
   .task.candidate { border-style:dashed; }
@@ -105,7 +98,6 @@ function panel(title, defaultLogin) {
     <div class="who"></div>
     <div class="row"><select class="conv" hidden></select></div>
     <div class="msgs"><div class="empty">로그인하면 대화가 보입니다</div></div>
-    <div class="suggest" hidden></div>
     <div class="row">
       <textarea class="text" rows="2" placeholder="메시지 입력 후 Enter (줄바꿈은 Shift+Enter)" disabled></textarea>
       <button class="send" disabled>보내기</button>
@@ -140,7 +132,17 @@ function panel(title, defaultLogin) {
     return r.json();
   }
 
-  const STATUS_KO = { pending: "정제 중", done: "정제됨", failed: "정제 실패", skip: "" };
+  const STATUS_KO = { pending: "정제 중", failed: "정제 실패", skip: "" };
+
+  function teacherMessageText(m) {
+    if (m.status !== "done") return null;
+    return m.refined_text ?? m.raw_text ?? null;
+  }
+
+  // 정제됐는지 원문 그대로인지는 교사에게 드러내지 않는다
+  function statusLabel(m) {
+    return m.status === "done" ? "" : (STATUS_KO[m.status] || "");
+  }
 
   function mk(tag, cls, text) {
     const e = document.createElement(tag);
@@ -151,14 +153,14 @@ function panel(title, defaultLogin) {
 
   function renderMsg(m) {
     const d = mk("div", "m" + (m.sender_id === me.id ? " me" : ""));
-    // 교사 화면: 학부모가 보낸 메시지는 정제문만 보여 준다(원문은 안 옴). 그 밖(학부모 화면 · 교사 자신의 글)은 있는 그대로
+    // 교사 화면: 완료된 학부모 글은 정제문이 있으면 정제문, 통과한 글이면 원문. 어느 쪽인지는 표시하지 않는다
     const refinedView = me.role === "teacher" && m.status !== "skip";
     if (!refinedView) {
       d.appendChild(mk("div", "", m.raw_text));
     } else if (m.status === "pending") {
       d.appendChild(mk("div", "pending", "정제 중…"));
     } else if (m.status === "done") {
-      d.appendChild(mk("div", "", m.refined_text));
+      d.appendChild(mk("div", "", teacherMessageText(m) ?? "표시할 메시지가 없습니다"));
       const a = m.analysis || {};
       const chips = mk("div", "chips");
       if (a.abusive) chips.appendChild(mk("span", "chip warn", "욕설·인신공격 있음"));
@@ -176,54 +178,20 @@ function panel(title, defaultLogin) {
       };
       d.appendChild(btn);
     }
-    const label = STATUS_KO[m.status];
+    const label = statusLabel(m);
     d.appendChild(mk("div", "meta", `${label ? label + " · " : ""}${new Date(m.created_at).toLocaleTimeString("ko-KR")}`));
     return d;
   }
 
-  // 자동 답장 추천: 마지막 메시지가 정제된 학부모 글이면 입력칸 위에 띄운다. 누르면 입력칸에 들어간다
-  const dismissed = new Set();
-  let suggestKey = "";
-  function renderSuggest(list) {
-    const box = q(".suggest");
-    const last = list[list.length - 1];
-    const show = me.role === "teacher" && last && last.sender_id !== me.id && last.status === "done" && !dismissed.has(last.id);
-    const rd = show ? (last.analysis || {}).reply_draft : null;
-    // 추천이 아직 없을 때: 방금 온 글이면 「만드는 중」, 오래된 글(기능 전에 온 글 등)이면 아무것도 안 띄운다
-    const fresh = show && Date.now() - new Date(last.created_at) < 90000;
-    const key = !show ? "" : !rd ? (fresh ? `${last.id}:wait` : "") : rd.error ? "" : `${last.id}:ok`;
-    if (key === suggestKey) return;  // 2초마다 새로 그리지 않게
-    suggestKey = key;
-    box.innerHTML = "";
-    box.hidden = !key;
-    box.className = "suggest" + (rd ? "" : " wait");
-    box.onclick = null;
-    if (!key) return;
-    if (!rd) { box.textContent = "답장 추천 만드는 중…"; return; }
-    box.appendChild(mk("div", "hint", "추천 답장 — 누르면 입력칸에 들어갑니다" + (rd.check.length ? ` (확인할 것 ${rd.check.length}개)` : "")));
-    box.appendChild(mk("div", "", rd.draft));
-    const x = mk("button", "x", "×");
-    x.title = "닫기";
-    x.onclick = e => { e.stopPropagation(); dismissed.add(last.id); renderSuggest(list); };
-    box.appendChild(x);
-    box.onclick = () => {
-      const ta = q(".text");
-      ta.value = rd.draft;
-      showChecks(q(".reply-checks"), rd.check);
-      ta.focus();
-      // 첫 빈칸 [ ] · [있습니다 / 없습니다] 를 골라 둔다 → 바로 타자로 덮어쓰면 된다
-      const i = rd.draft.indexOf("["), j = rd.draft.indexOf("]", i);
-      if (i >= 0 && j > i) ta.setSelectionRange(i, j + 1);
-    };
-  }
-
-  // 띵: 교사 = 학부모 글이 정제되어 읽을 수 있게 됐을 때, 학부모 = 교사 글이 새로 왔을 때
+  // 띵: 교사 = 학부모 글이 처리되어 읽을 수 있게 됐을 때, 학부모 = 교사 글이 새로 왔을 때
   function checkDing(list) {
     if (seen !== null) {
       for (const m of list) {
         if (m.sender_id === me.id) continue;
         const prev = seen.get(m.id);
-        if (me.role === "teacher" && m.status === "done" && prev !== "done") ding(`${me.name} 선생님 · 새 메시지`, m.refined_text);
+        const text = teacherMessageText(m);
+        if (me.role === "teacher" && m.status === "done" && prev !== "done" && text != null)
+          ding(`${me.name} 선생님 · 새 메시지`, text);
         if (me.role !== "teacher" && m.status === "skip" && prev === undefined) ding(`${me.name} · 선생님 답장`, m.raw_text);
       }
     }
@@ -266,7 +234,6 @@ function panel(title, defaultLogin) {
       const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
       box.innerHTML = list.length ? "" : '<div class="empty">아직 메시지가 없습니다</div>';
       for (const m of list) box.appendChild(renderMsg(m));
-      renderSuggest(list);
       if (atBottom) box.scrollTop = box.scrollHeight;
     } catch (e) { q(".err").textContent = e.message; }
     busy = false;
@@ -288,7 +255,7 @@ function panel(title, defaultLogin) {
       sel.innerHTML = "";
       for (const c of convs) sel.appendChild(new Option(`대화 #${c.id} · 학생 ${c.student_name}`, c.id));
       sel.hidden = convs.length < 2;
-      sel.onchange = () => { convId = +sel.value; seen = null; suggestKey = ""; q(".reply-checks").innerHTML = ""; refresh(); };
+      sel.onchange = () => { convId = +sel.value; seen = null; q(".reply-checks").innerHTML = ""; refresh(); };
       q(".who").textContent = `${res.name} (${res.role})`;
       q(".who").appendChild(mk("span", "closed"));
       q(".who").appendChild(mk("span", "live"));
