@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, conversations, drafts, events, messages, notices, todos, ws
+from app.routers import auth, conversations, drafts, events, messages, notices, reports, todos, ws
 
 app = FastAPI(title="이음")
 app.add_middleware(
@@ -15,6 +15,7 @@ app.include_router(drafts.router)
 app.include_router(todos.router)
 app.include_router(events.router)
 app.include_router(notices.router)
+app.include_router(reports.router)
 app.include_router(ws.router)
 
 

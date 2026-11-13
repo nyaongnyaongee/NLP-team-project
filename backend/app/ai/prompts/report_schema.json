@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {"type": "string"},
+    "incidents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "no": {"type": "integer"},
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["욕설", "인신공격 · 모욕", "비꼼 · 조롱", "반말 · 호통", "위협 · 협박", "교사 자질 비난",
+                       "과도한 요구", "반복 독촉", "사생활 · 근무시간 외 요구", "기타"]
+            }
+          },
+          "quote": {"type": "string"}
+        },
+        "required": ["no", "types", "quote"],
+        "additionalProperties": false
+      }
+    },
+    "threats": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["아동학대 신고", "경찰", "고소 · 법적 대응", "교육청", "교장 · 교감", "맘카페 · 학부모 단톡", "언론",
+                 "녹음 · 증거", "학교 방문", "신변 위협", "막연한 경고", "기타"]
+      }
+    },
+    "parent_requests": {"type": "array", "items": {"type": "string"}},
+    "teacher_responses": {"type": "array", "items": {"type": "string"}},
+    "severity": {"type": "string", "enum": ["낮음", "보통", "높음"]},
+    "severity_reason": {"type": "string"},
+    "check": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": ["summary", "incidents", "threats", "parent_requests", "teacher_responses", "severity",
+               "severity_reason", "check"],
+  "additionalProperties": false
+}

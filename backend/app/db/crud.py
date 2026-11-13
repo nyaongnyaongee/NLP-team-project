@@ -258,6 +258,44 @@ def notice_recipients(db: Session, teacher_id: int) -> list[int]:
     ).all()]
 
 
+# ---- 신고 보고서 (D).  conversations.report = {"status": "pending" | "done" | "failed", "memo", …보고서 | "error", "at"}
+
+def set_report_pending(db: Session, conv_id: int, memo: str | None):
+    """신고(또는 다시 만들기). 처음 신고한 때(reported_at)는 바꾸지 않는다."""
+    row = db.execute(
+        text("UPDATE conversations SET report = jsonb_build_object('status', 'pending', 'memo', CAST(:m AS TEXT)), "
+             "reported_at = COALESCE(reported_at, now()) WHERE id = :i RETURNING *"),
+        {"m": memo, "i": conv_id},
+    ).mappings().first()
+    db.commit()
+    return row
+
+
+def save_report_result(db: Session, conv_id: int, result: dict, memo: str | None) -> None:
+    if result["status"] == "done":
+        state = {**result["report"], "status": "done", "memo": memo}
+    else:
+        state = {"status": "failed", "error": result["error"], "memo": memo}
+    db.execute(
+        text("UPDATE conversations SET report = CAST(:r AS JSONB) || jsonb_build_object('at', now()) WHERE id = :i"),
+        {"r": json.dumps(state, ensure_ascii=False), "i": conv_id},
+    )
+    db.commit()
+
+
+def list_reported(db: Session):
+    """민원대응팀 목록: 신고된 대화 전부, 최근 신고 먼저. 교사 · 학부모 이름을 붙인다."""
+    return db.execute(text(
+        "SELECT c.*, t.name AS teacher_name, p.name AS parent_name FROM conversations c "
+        "JOIN users t ON t.id = c.teacher_id JOIN users p ON p.id = c.parent_id "
+        "WHERE c.reported_at IS NOT NULL ORDER BY c.reported_at DESC, c.id DESC"
+    )).mappings().all()
+
+
+def user_ids_with_role(db: Session, role: str) -> list[int]:
+    return [r[0] for r in db.execute(text("SELECT id FROM users WHERE role = :r ORDER BY id"), {"r": role}).all()]
+
+
 # ---- 시험용 초기화 (/dev/reset)
 
 def dev_reset(db: Session) -> list[int]:

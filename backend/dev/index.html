@@ -74,6 +74,19 @@
   .nitem button.x { background:transparent; color:var(--mute); border:1px solid var(--line); }
   .pnotices { border-top:1px solid var(--line); margin-top:8px; padding-top:8px; font-size:13px; }
   .pnotices summary { cursor:pointer; color:var(--mute); }
+  .panel.team { grid-column:1 / -1; min-height:0; }
+  .rlist { display:flex; flex-direction:column; gap:6px; }
+  .ritem { border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:13px; }
+  .ritem summary { cursor:pointer; }
+  .sev { font-size:11px; padding:1px 7px; border-radius:99px; border:1px solid var(--line); margin-left:4px; }
+  .sev.높음 { color:#dc2626; border-color:#dc2626; } .sev.보통 { color:#b45309; border-color:#b45309; }
+  .rbody { margin-top:6px; }
+  .rbody h4 { font-size:12px; color:var(--mute); margin:8px 0 2px; font-weight:600; }
+  .rbody ul { margin:0; padding-left:18px; }
+  .quote { background:var(--bg); border-left:3px solid #dc2626; padding:2px 8px; margin:2px 0; white-space:pre-wrap; }
+  .rmsg { font-size:12px; white-space:pre-wrap; padding:2px 0; border-bottom:1px dashed var(--line); }
+  .rmsg.hit { background:rgba(220,38,38,.08); }
+  .rsum { white-space:pre-wrap; font-size:13px; margin-top:4px; }
   .link { margin-top:6px; padding:2px 8px; font-size:12px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; cursor:pointer; }
 </style>
 </head>
@@ -101,6 +114,7 @@ function panel(title, defaultLogin) {
         <option value="parent1">parent1 (박서연)</option>
         <option value="parent2">parent2 (이도윤)</option>
         <option value="teacher1">teacher1 (김민지 교사)</option>
+        <option value="team1">team1 (정하은 민원대응팀)</option>
       </select>
       <button class="go">로그인</button>
     </div>
@@ -120,6 +134,13 @@ function panel(title, defaultLogin) {
       <ul class="checks reply-checks"></ul>
       <div class="row"><button class="close">대화 닫기 · 할 일 뽑기</button><span class="xstate"></span></div>
       <div class="tasks"></div>
+      <details class="rbox">
+        <summary>민원대응팀에 신고</summary>
+        <div class="row"><input class="rmemo" placeholder="신고 사유 (예: 밤마다 욕설 · 협박이 이어짐) — 비워도 됨">
+          <button class="report">신고 · 보고서 만들기</button></div>
+        <div class="xstate rstate"></div>
+        <div class="rsum"></div>
+      </details>
       <details>
         <summary>공지 쓰기 · 보내기</summary>
         <div class="row"><textarea class="points" rows="3" placeholder="공지 요점 (예: 11/14 현장학습, 9시 운동장, 도시락 · 물)"></textarea></div>
@@ -132,6 +153,7 @@ function panel(title, defaultLogin) {
         <div class="nlist tnotices"></div>
       </details>
     </div>
+    <div class="rlist" hidden><div class="empty">신고된 대화가 없습니다</div></div>
     <details class="pnotices" open hidden>
       <summary>받은 공지</summary>
       <div class="nlist pnlist"></div>
@@ -144,6 +166,7 @@ function panel(title, defaultLogin) {
   let busy = false, again = false;          // 새로 읽기가 겹치지 않게
   let noticeId = null;                      // 교사가 고치고 있는 공지 (null = 새 공지)
   let seenNotices = null;                   // 학부모: 이미 본 공지 id (띵 판단용)
+  let seenReports = null;                   // 민원대응팀: 신고 id → 상태 (띵 판단용)
 
   async function api(path, opt = {}) {
     const r = await fetch(API + path, { ...opt, headers: {
@@ -241,6 +264,7 @@ function panel(title, defaultLogin) {
       if (d.type === "ready") { setLive(true); refresh(); }
       if (d.type === "changed" && d.conversation_id === convId) refresh();
       if (d.type === "notice") loadNotices();
+      if (d.type === "report" && me.role === "complaint_team") loadReports();
     };
     ws.onclose = () => {
       if (sock === ws) setLive(false);
@@ -275,6 +299,17 @@ function panel(title, defaultLogin) {
         { login_id: q(".login").value, password: "test1234" }) });
       token = res.token;
       me = { name: res.name, role: res.role };
+      const team = res.role === "complaint_team";
+      for (const s of [".msgs", ".text", ".send", ".conv"]) q(s).closest(".row, .msgs").hidden = team;
+      q(".rlist").hidden = !team;
+      if (team) {  // 민원대응팀: 대화가 없고 신고 목록만 본다
+        q(".who").textContent = `${res.name} (민원대응팀)`; q(".who").appendChild(mk("span", "live"));
+        q(".tools").hidden = true; q(".pnotices").hidden = true;
+        clearInterval(timer); seenReports = null; gen += 1; if (sock) sock.close(); setLive(false); connect(gen);
+        loadReports();
+        timer = setInterval(() => { if (!live) loadReports(); }, 5000);
+        return;
+      }
       const convs = await api("/conversations");
       convId = convs[0].id;
       // 내 id 는 첫 대화의 teacher_id/parent_id 로 알아냄
@@ -285,7 +320,7 @@ function panel(title, defaultLogin) {
       sel.hidden = convs.length < 2;
       sel.onchange = () => {
         convId = +sel.value; seen = null; q(".reply-checks").innerHTML = "";
-        q(".text").value = ""; q(".memo").value = "";  // 쓰던 글이 다른 학부모에게 가지 않게
+        q(".text").value = ""; q(".memo").value = ""; q(".rmemo").value = "";  // 쓰던 글이 다른 학부모에게 가지 않게
         refresh();
       };
       q(".who").textContent = `${res.name} (${res.role})`;
@@ -343,6 +378,83 @@ function panel(title, defaultLogin) {
     st.textContent = !closed ? "" : x.status === "pending" ? "할 일 · 일정 뽑는 중…"
       : x.status === "failed" ? "뽑지 못했습니다: " + x.error : x.status === "done" ? `후보 ${x.count}개` : "";
     st.style.color = x.status === "failed" ? "#dc2626" : "";
+    showReport(conv);
+  }
+
+  // 신고(D): 담임에게는 요약 · 심각도만 (원문 인용은 서버가 뺌). 민원대응팀은 아래 loadReports 에서 전부
+  function showReport(conv) {
+    const r = conv.report, b = q(".report"), st = q(".rstate"), sum = q(".rsum");
+    b.disabled = r && r.status === "pending";
+    b.textContent = r ? "보고서 다시 만들기" : "신고 · 보고서 만들기";
+    b.onclick = async () => {
+      if (!r && !confirm("이 대화를 민원대응팀에 신고합니다. 민원대응팀은 학부모 원문까지 봅니다. 신고할까요?")) return;
+      b.disabled = true; q(".err").textContent = "";
+      try { await api(`/conversations/${convId}/report`, { method: "POST", body: JSON.stringify({ memo: q(".rmemo").value.trim() || null }) }); }
+      catch (e) { q(".err").textContent = e.message; }
+      refresh();
+    };
+    st.style.color = r && r.status === "failed" ? "#dc2626" : "";
+    st.textContent = !r ? "" : `신고함 ${when(conv.reported_at)} · ` + (r.status === "pending" ? "보고서 쓰는 중…"
+      : r.status === "failed" ? "보고서를 쓰지 못했습니다: " + r.error : `심각도 ${r.severity || "?"} · 문제 메시지 ${(r.incidents || []).length}개`);
+    sum.textContent = r && r.status === "done" ? r.summary : "";
+    if (r) q(".rbox").open = true;
+  }
+
+  function listBlock(box, title, items) {
+    if (!items || !items.length) return;
+    box.appendChild(mk("h4", "", title));
+    const ul = mk("ul");
+    for (const it of items) ul.appendChild(mk("li", "", it));
+    box.appendChild(ul);
+  }
+  async function reportDetail(id, box) {
+    const d = await api(`/reports/${id}`), r = d.report;
+    box.innerHTML = "";
+    if (r.status !== "done") { box.appendChild(mk("div", "note", r.status === "pending" ? "보고서 쓰는 중…" : "보고서를 쓰지 못했습니다: " + r.error)); }
+    else {
+      box.appendChild(mk("div", "rsum", r.summary));
+      if (r.severity_reason) box.appendChild(mk("div", "meta", `심각도 ${r.severity} — ${r.severity_reason}`));
+      if (r.memo) listBlock(box, "담임 메모", [r.memo]);
+      if (r.incidents.length) {
+        box.appendChild(mk("h4", "", "문제 메시지 (원문 인용)"));
+        for (const i of r.incidents) {
+          box.appendChild(mk("div", "meta", `${when(i.at)} · ${i.types.join(", ")}`));
+          box.appendChild(mk("div", "quote", i.quote));
+        }
+      }
+      listBlock(box, "위협", r.threats);
+      listBlock(box, "학부모 요구", r.parent_requests);
+      listBlock(box, "담임 응대", r.teacher_responses);
+      listBlock(box, "확인할 것", r.check);
+    }
+    const hits = new Set((r.incidents || []).map(i => i.message_id));
+    const all = mk("details"); all.appendChild(mk("summary", "", `대화 전체 · 원문 (${d.messages.length})`));
+    for (const m of d.messages)
+      all.appendChild(mk("div", "rmsg" + (hits.has(m.id) ? " hit" : ""), `${when(m.created_at)} ${m.who === "parent" ? d.parent_name + "(학부모)" : d.teacher_name + "(교사)"}: ${m.raw_text}`));
+    box.appendChild(all);
+  }
+  async function loadReports() {
+    if (!token) return;
+    try {
+      const list = await api("/reports");
+      const box = q(".rlist");
+      const open = new Set([...box.querySelectorAll("details.ritem[open]")].map(e => +e.dataset.id));
+      box.innerHTML = list.length ? "" : '<div class="empty">신고된 대화가 없습니다</div>';
+      for (const x of list) {
+        const d = mk("details", "ritem"); d.dataset.id = x.conversation_id;
+        const s = mk("summary", "", `대화 #${x.conversation_id} · ${x.teacher_name} 교사 ← ${x.parent_name} (학생 ${x.student_name}) · ${when(x.reported_at)}`);
+        if (x.status === "done") s.appendChild(mk("span", "sev " + (x.severity || ""), "심각도 " + (x.severity || "?")));
+        else s.appendChild(mk("span", "sev", x.status === "pending" ? "쓰는 중" : "실패"));
+        d.appendChild(s);
+        const body = mk("div", "rbody"); d.appendChild(body);
+        d.ontoggle = () => { if (d.open) reportDetail(x.conversation_id, body).catch(e => { q(".err").textContent = e.message; }); };
+        box.appendChild(d);
+        if (open.has(x.conversation_id)) d.open = true;
+        const prev = seenReports && seenReports.get(x.conversation_id);
+        if (seenReports !== null && prev !== x.status && x.status === "done") ding(`${me.name} · 신고 보고서`, x.summary);
+      }
+      seenReports = new Map(list.map(x => [x.conversation_id, x.status]));
+    } catch (e) { q(".err").textContent = e.message; }
   }
 
   const KIND_KO = { todo: "할 일", event: "일정" };
@@ -547,7 +659,8 @@ function ding(title, body) {
 }
 
 const grid = document.getElementById("grid");
-grid.append(panel("학부모 화면", "parent1"), panel("교사 화면", "teacher1"));
+const teamPanel = panel("민원대응팀 화면", "team1"); teamPanel.classList.add("team");
+grid.append(panel("학부모 화면", "parent1"), panel("교사 화면", "teacher1"), teamPanel);
 grid.querySelectorAll(".go").forEach(b => b.click());  // 열자마자 자동 로그인
 </script>
 </body>
