@@ -283,7 +283,11 @@ function panel(title, defaultLogin) {
       sel.innerHTML = "";
       for (const c of convs) sel.appendChild(new Option(`대화 #${c.id} · 학생 ${c.student_name}`, c.id));
       sel.hidden = convs.length < 2;
-      sel.onchange = () => { convId = +sel.value; seen = null; q(".reply-checks").innerHTML = ""; refresh(); };
+      sel.onchange = () => {
+        convId = +sel.value; seen = null; q(".reply-checks").innerHTML = "";
+        q(".text").value = ""; q(".memo").value = "";  // 쓰던 글이 다른 학부모에게 가지 않게
+        refresh();
+      };
       q(".who").textContent = `${res.name} (${res.role})`;
       q(".who").appendChild(mk("span", "closed"));
       q(".who").appendChild(mk("span", "live"));
@@ -383,11 +387,13 @@ function panel(title, defaultLogin) {
     const b = q(".draft");
     b.disabled = true; b.textContent = "만드는 중…"; q(".err").textContent = "";
     try {
-      const d = await api(`/conversations/${convId}/draft`, { method: "POST", body: JSON.stringify({ memo: q(".memo").value.trim() || null }) });
+      const forConv = convId;
+      const d = await api(`/conversations/${forConv}/draft`, { method: "POST", body: JSON.stringify({ memo: q(".memo").value.trim() || null }) });
+      if (convId !== forConv) return;  // 만드는 동안 대화를 바꿨으면 버림 (finally 가 버튼을 되돌림)
       q(".text").value = d.draft;
       showChecks(q(".reply-checks"), d.check);
     } catch (e) { q(".err").textContent = e.message; }
-    b.disabled = false; b.textContent = "메모로 초안 쓰기";
+    finally { b.disabled = false; b.textContent = "메모로 초안 쓰기"; }
   };
 
   // 공지: 초안(Claude) → 제목 · 본문을 고쳐서 [저장](쓰는 중) → [보내기]. 보낸 공지는 고칠 수 없다
