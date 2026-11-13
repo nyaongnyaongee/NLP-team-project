@@ -45,13 +45,13 @@ def engine():
 
 @pytest.fixture(scope="session")
 def ids(engine):
-    """계정 3개 + 대화 2개 (parent1↔teacher1, parent2↔teacher1)"""
+    """계정 4개(민원대응팀 team1 포함) + 대화 2개 (parent1↔teacher1, parent2↔teacher1)"""
     from app.core.auth import hash_password
 
     out = {}
     with engine.begin() as c:
         for role, name, login in [("teacher", "김민지", "teacher1"), ("parent", "박서연", "parent1"),
-                                  ("parent", "이도윤", "parent2")]:
+                                  ("parent", "이도윤", "parent2"), ("complaint_team", "정하은", "team1")]:
             out[login] = c.execute(
                 text("INSERT INTO users (role,name,login_id,password_hash) VALUES (:r,:n,:l,:p) RETURNING id"),
                 {"r": role, "n": name, "l": login, "p": hash_password("pw1234")},
@@ -96,6 +96,8 @@ def no_background_refine(monkeypatch):
     정제를 시험하는 파일만 refine_with 로 가짜 응답을 넣어 켠다."""
     import app.routers.conversations as conversations_router
     import app.routers.messages as messages_router
+    import app.routers.reports as reports_router
 
     monkeypatch.setattr(messages_router, "_refine_in_background", lambda *a, **k: None)
     monkeypatch.setattr(conversations_router, "_extract_in_background", lambda *a, **k: None)  # 대화를 닫아도 추출 안 함
+    monkeypatch.setattr(reports_router, "_report_in_background", lambda *a, **k: None)  # 신고해도 보고서 안 씀

@@ -15,6 +15,7 @@ from app.db import crud
 from app.db.database import SessionLocal, get_db
 from app.routers import drafts as drafts_router
 from app.routers import messages as messages_router
+from app.routers import reports as reports_router
 from app.routers.ws import hub
 from app.schemas.todo import ConversationIn
 
@@ -28,6 +29,10 @@ def _conv_view(conv, user) -> dict:
     d = dict(conv)
     if user["role"] != "teacher":
         d.pop("extract", None)  # 추출 상태는 교사용
+        d.pop("report", None)   # 신고 여부도 학부모에게는 주지 않는다
+        d.pop("reported_at", None)
+    else:
+        d["report"] = reports_router.teacher_view(d.get("report"))  # 원문 인용은 뺀다
     return d
 
 
