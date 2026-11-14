@@ -1,5 +1,5 @@
 # 공지사항  [채원]  (시험용으로 재관이 채움)
-# 교사: 쓰기(draft) → 고치기 → [보내기](sent). 보낸 공지는 고치거나 지울 수 없다.
+# 교사: 쓰기(draft) → 고치기 → [보내기](sent). 보낸 공지도 고치거나 지울 수 있다 (학부모에게 알림). 다시 보내기만 안 됨.
 # 받는 사람 = 그 교사와 대화가 있는 학부모 전부 (DB 에 「반」 이 없어서). 학부모는 보낸 공지만 본다.
 # 초안(Claude)은 POST /drafts/notice — 여기서는 저장 · 보내기만 한다.
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,7 +28,7 @@ def _my_notice(db: Session, notice_id: int, user):
 
 def _not_sent(n):
     if n["status"] == "sent":
-        raise HTTPException(409, "이미 보낸 공지는 고치거나 지울 수 없습니다")
+        raise HTTPException(409, "이미 보낸 공지입니다")
 
 
 @router.get("/notices", response_model=list[NoticeOut])
@@ -60,22 +60,34 @@ def create_notice(body: NoticeIn, db: Session = Depends(get_db), user=Depends(cu
     return dict(crud.create_notice(db, user["id"], body.title.strip(), body.body.strip()))
 
 
+def _notify_if_sent(db: Session, n, user):
+    """보낸 공지가 바뀌거나 지워지면 받는 학부모 화면도 다시 불러오게 (번호만)."""
+    if n["status"] == "sent":
+        parents = crud.notice_recipients(db, user["id"])
+        hub.notify_users([*parents, user["id"]], {"type": "notice", "notice_id": n["id"]})
+
+
 @router.patch("/notices/{notice_id}", response_model=NoticeOut)
 def update_notice(notice_id: int, body: NoticePatch, db: Session = Depends(get_db), user=Depends(current_user)):
+    """고치기. 보낸 공지도 고칠 수 있고, 학부모에게 바로 바뀐 내용이 보인다 (「수정됨」 = updated_at > sent_at)."""
     _need_teacher(user)
-    _not_sent(_my_notice(db, notice_id, user))
+    n = _my_notice(db, notice_id, user)
     fields = {k: getattr(body, k).strip() for k in body.model_fields_set if getattr(body, k) is not None}
     if not crud.update_notice(db, notice_id, fields):
-        raise HTTPException(409, "이미 보낸 공지는 고치거나 지울 수 없습니다")
+        raise HTTPException(404, "찾을 수 없습니다")
+    if fields:
+        _notify_if_sent(db, n, user)
     return dict(crud.get_notice(db, notice_id))
 
 
 @router.delete("/notices/{notice_id}", status_code=204)
 def delete_notice(notice_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    """지우기. 보낸 공지면 학부모 화면에서도 사라진다."""
     _need_teacher(user)
-    _not_sent(_my_notice(db, notice_id, user))
+    n = _my_notice(db, notice_id, user)
     if not crud.delete_notice(db, notice_id):
-        raise HTTPException(409, "이미 보낸 공지는 고치거나 지울 수 없습니다")
+        raise HTTPException(404, "찾을 수 없습니다")
+    _notify_if_sent(db, n, user)
 
 
 @router.post("/notices/{notice_id}/send", response_model=NoticeOut)

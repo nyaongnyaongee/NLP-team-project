@@ -547,7 +547,7 @@ function panel(title, defaultLogin) {
     finally { b.disabled = false; b.textContent = "메모로 초안 쓰기"; }
   };
 
-  // 공지: 초안(Claude) → 제목 · 본문을 고쳐서 [저장](쓰는 중) → [보내기]. 보낸 공지는 고칠 수 없다
+  // 공지: 초안(Claude) → 제목 · 본문을 고쳐서 [저장](쓰는 중) → [보내기]. 보낸 공지 고치기 · 지우기는 React 화면에서
   const nstate = t => { q(".nstate").textContent = t; };
   function editNotice(n) {
     noticeId = n ? n.id : null;
@@ -588,7 +588,7 @@ function panel(title, defaultLogin) {
   };
   q(".nsend").onclick = async () => {
     q(".err").textContent = "";
-    if (!confirm("대화가 있는 학부모 모두에게 보냅니다. 보낸 뒤에는 고치거나 지울 수 없습니다. 보낼까요?")) return;
+    if (!confirm("대화가 있는 학부모 모두에게 보냅니다. 보낼까요?")) return;
     const b = q(".nsend"); b.disabled = true;
     try {
       const n = await saveNotice();
