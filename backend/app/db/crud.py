@@ -229,10 +229,11 @@ def list_teacher_notices(db: Session, teacher_id: int):
 
 
 def list_parent_notices(db: Session, parent_id: int):
-    """학부모가 받는 공지: 대화가 있는 교사가 보낸 것만, 최근 것부터."""
+    """학부모가 받는 공지: 내 아이 담임(students) 또는 대화가 있는 교사가 보낸 것만, 최근 것부터."""
     return db.execute(
         text("SELECT * FROM notices WHERE status = 'sent' "
-             "AND teacher_id IN (SELECT teacher_id FROM conversations WHERE parent_id = :p) "
+             "AND teacher_id IN (SELECT teacher_id FROM students WHERE parent_id = :p "
+             "                   UNION SELECT teacher_id FROM conversations WHERE parent_id = :p) "
              "ORDER BY sent_at DESC, id DESC"),
         {"p": parent_id},
     ).mappings().all()
@@ -265,9 +266,11 @@ def delete_notice(db: Session, notice_id: int) -> bool:
 
 
 def notice_recipients(db: Session, teacher_id: int) -> list[int]:
-    """공지를 받는 학부모 id (그 교사와 대화가 있는 사람)."""
+    """공지를 받는 학부모 id = 반 학생의 학부모 전원 (students.parent_id) + 그 교사와 대화가 있는 학부모
+    (반 명단에 없는 학생의 예전 대화도 빠지지 않게). list_parent_notices 와 같은 기준."""
     return [r[0] for r in db.execute(
-        text("SELECT DISTINCT parent_id FROM conversations WHERE teacher_id = :t ORDER BY parent_id"), {"t": teacher_id},
+        text("SELECT parent_id FROM students WHERE teacher_id = :t AND parent_id IS NOT NULL "
+             "UNION SELECT parent_id FROM conversations WHERE teacher_id = :t ORDER BY 1"), {"t": teacher_id},
     ).all()]
 
 
