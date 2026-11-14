@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.ai.extract import KST, extract_tasks
-from app.ai.roster import load_sample_roster
+from app.ai.roster import class_roster
 from app.core.auth import current_user
 from app.db import crud
 from app.db.database import SessionLocal, get_db
@@ -53,8 +53,9 @@ def _extract_in_background(conv_id: int) -> None:
                 history = drafts_router._history(crud.list_messages(db, conv_id), conv["parent_id"], HISTORY_LIMIT)
                 existing = crud.task_titles(db, conv_id, ("added", "done"))
                 adults = crud.adult_names(db)
+                roster = class_roster(crud.student_names(db, conv["teacher_id"]), conv["student_name"])
             today = datetime.now(KST).date()
-            result = extract_tasks(history, today, existing, load_sample_roster(), adults)
+            result = extract_tasks(history, today, existing, roster, adults)
     except Exception as e:
         log.exception("추출 준비 중 오류 (conversation %s)", conv_id)
         result = {"status": "failed", "tasks": [], "error": f"추출 중 오류 ({type(e).__name__})"}

@@ -12,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.ai.report import write_report
-from app.ai.roster import load_sample_roster
+from app.ai.roster import class_roster
 from app.core.auth import current_user
 from app.db import crud
 from app.db.database import SessionLocal, get_db
@@ -60,7 +60,8 @@ def _report_in_background(conv_id: int, memo: str | None) -> None:
                 conv = crud.get_conversation(db, conv_id)
                 history = _history(crud.list_messages(db, conv_id), conv["parent_id"])
                 adults = crud.adult_names(db)
-            result = write_report(history, memo, load_sample_roster(), adults)
+                roster = class_roster(crud.student_names(db, conv["teacher_id"]), conv["student_name"])
+            result = write_report(history, memo, roster, adults)
     except Exception as e:
         log.exception("보고서 준비 중 오류 (conversation %s)", conv_id)
         result = {"status": "failed", "report": None, "error": f"보고서 작성 중 오류 ({type(e).__name__})"}

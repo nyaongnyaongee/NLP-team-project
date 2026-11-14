@@ -1,4 +1,4 @@
--- 이음 시연용 DB 테이블 (PostgreSQL) — 5개
+-- 이음 시연용 DB 테이블 (PostgreSQL) — 7개
 
 -- 사용자: 학부모 · 교사 · 민원대응팀
 CREATE TABLE users (
@@ -9,12 +9,22 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL
 );
 
+-- 학생: 담임 한 명의 반 (「반」 테이블은 시연에서 안 만듦 — teacher_id 가 곧 반). 가명처리 학생 명단도 여기서
+CREATE TABLE students (
+  id         BIGSERIAL PRIMARY KEY,
+  teacher_id BIGINT NOT NULL REFERENCES users(id),
+  name       TEXT NOT NULL,                 -- 이름만 (성 없이, 가명처리 명단과 같게)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (teacher_id, name)
+);
+
 -- 대화: 학부모 한 명 ↔ 담임 한 명. 신고(D)도 여기에
 CREATE TABLE conversations (
   id           BIGSERIAL PRIMARY KEY,
   teacher_id   BIGINT NOT NULL REFERENCES users(id),
   parent_id    BIGINT NOT NULL REFERENCES users(id),
   student_name TEXT NOT NULL,
+  student_id   BIGINT REFERENCES students(id),  -- 반 명단에 있는 학생이면. 없으면 NULL (예전 대화)
   status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),  -- closed → C 추출
   report       JSONB,                       -- 신고 보고서. NULL 이면 신고 안 함
   reported_at  TIMESTAMPTZ,                 -- 민원대응팀 화면 = 이 값이 있는 대화
@@ -62,6 +72,16 @@ CREATE TABLE notices (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   sent_at    TIMESTAMPTZ
+);
+
+-- 학생 메모: 담임만 보는 관찰 기록 (날짜 + 짧은 글 여러 개). 학부모 · 민원대응팀 · Claude 에게는 주지 않는다
+CREATE TABLE student_notes (
+  id         BIGSERIAL PRIMARY KEY,
+  student_id BIGINT NOT NULL REFERENCES students(id),
+  teacher_id BIGINT NOT NULL REFERENCES users(id),  -- 쓴 교사 (이 사람만 본다)
+  body       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- messages.analysis 예시 (확정 아님, 프롬프트에 따라 바뀜)
