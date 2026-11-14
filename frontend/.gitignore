@@ -1,0 +1,33 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# 화면에서 쓰지 않는 2MB 이미지(데모 교사 사진). 쓰게 되면 용량을 줄여 이 줄을 지우고 올린다.
+src/design/teacher-profile.png
+
+# 비밀 값·개인 도구 설정 (이 폴더에는 아직 없지만 실수로 올라가지 않게)
+.env
+.env.*
+!.env.example
+.claude/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
