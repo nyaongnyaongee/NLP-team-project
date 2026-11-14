@@ -10,7 +10,7 @@ import { useMessages } from '../chat/useMessages'
 
 // 학부모 대화방. 정제문과 정제 상태(메시지 status)는 읽지도 표시하지도 않는다 (중대 5).
 // 표시하는 "대화 상태"는 대화(conversation)의 열림/닫힘이며 메시지의 정제 상태와 무관하다.
-export default function ParentChat({ conversation: initial }: { conversation: Conversation }) {
+export default function ParentChat({ conversation: initial, onBack }: { conversation: Conversation; onBack: () => void }) {
   const { conversation, refresh: refreshConversation } = useConversation(initial)
   const { messages, loading, error, upsert, refresh: refreshMessages } = useMessages(initial.id)
 
@@ -30,6 +30,9 @@ export default function ParentChat({ conversation: initial }: { conversation: Co
   return (
     <section>
       <div className="chat-head">
+        <button type="button" className="back" onClick={onBack}>
+          ‹ 대화 목록
+        </button>
         <span className="tag">{conversation.status === 'closed' ? '종료된 대화' : '대화 중'}</span>
       </div>
       <div className="chat-person">

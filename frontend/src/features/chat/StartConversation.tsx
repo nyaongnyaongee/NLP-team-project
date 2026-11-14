@@ -5,7 +5,7 @@ import { useResource } from './useResource'
 
 const NONE: Startable[] = []
 
-// 대화 시작: 학생을 고르면 열린 대화가 있으면 그 대화를, 없으면 새 대화를 연다.
+// 대화 시작: 학생을 고르면 새 대화방을 연다 (문의마다 새 대화).
 // 교사 = 학부모가 등록된 반 학생 목록, 학부모 = 내 아이 목록 (서버가 역할로 거른다).
 export default function StartConversation({
   role,
@@ -40,7 +40,7 @@ export default function StartConversation({
   return (
     <section className="start-conversation">
       <div className="notice-heading">
-        <h3>{role === 'teacher' ? '새 대화 — 학생 고르기' : '선생님께 문의하기'}</h3>
+        <h3>{role === 'teacher' ? '새 대화 — 학생 고르기' : '새 문의 — 자녀 고르기'}</h3>
         {onCancel && (
           <button type="button" className="notice-detail" onClick={onCancel}>
             닫기
@@ -66,7 +66,7 @@ export default function StartConversation({
                   <small>{role === 'teacher' ? `학부모 ${s.parent_name}` : `담임 ${s.teacher_name} 선생님`}</small>
                 </span>
                 <span className="tag">
-                  {busyId === s.student_id ? '여는 중…' : s.open_conversation_id ? '대화 이어가기' : '대화 시작'}
+                  {busyId === s.student_id ? '여는 중…' : '새 대화 시작'}
                 </span>
               </span>
               <span className="muted" aria-hidden="true">

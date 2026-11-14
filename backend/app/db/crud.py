@@ -19,7 +19,8 @@ def get_conversation(db: Session, conv_id: int):
 
 def list_conversations(db: Session, user_id: int):
     return db.execute(
-        text("SELECT * FROM conversations WHERE teacher_id = :u OR parent_id = :u ORDER BY id"),
+        text("SELECT c.*, (SELECT max(m.created_at) FROM messages m WHERE m.conversation_id = c.id) AS last_message_at "
+             "FROM conversations c WHERE c.teacher_id = :u OR c.parent_id = :u ORDER BY c.id"),
         {"u": user_id},
     ).mappings().all()
 
@@ -106,15 +107,11 @@ def create_conversation(db: Session, teacher_id: int, parent_id: int, student_na
 
 
 def startable_students(db: Session, user: dict):
-    """대화를 시작할 수 있는 학생 (학부모가 등록된 학생만). 교사 = 자기 반, 학부모 = 자기 아이.
-    open_conversation_id = 이 학생 · 학부모 · 담임의 열린 대화 (없으면 NULL)."""
+    """대화를 시작할 수 있는 학생 (학부모가 등록된 학생만). 교사 = 자기 반, 학부모 = 자기 아이."""
     who = "s.teacher_id" if user["role"] == "teacher" else "s.parent_id"
     return db.execute(text(
         "SELECT s.id AS student_id, s.name AS student_name, s.teacher_id, t.name AS teacher_name, "
-        "       s.parent_id, p.name AS parent_name, "
-        "       (SELECT c.id FROM conversations c WHERE c.teacher_id = s.teacher_id AND c.parent_id = s.parent_id "
-        "          AND (c.student_id = s.id OR c.student_name = s.name) AND c.status = 'open' "
-        "        ORDER BY c.id DESC LIMIT 1) AS open_conversation_id "
+        "       s.parent_id, p.name AS parent_name "
         "FROM students s JOIN users t ON t.id = s.teacher_id JOIN users p ON p.id = s.parent_id "
         f"WHERE {who} = :u ORDER BY s.name"), {"u": user["id"]}).mappings().all()
 
