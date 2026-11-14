@@ -15,6 +15,15 @@ export type Conversation = {
   // report, reported_at 은 선언하지 않는다 (치명 2)
 }
 
+// 대화를 시작할 수 있는 학생 (교사 = 학부모가 등록된 반 학생, 학부모 = 내 아이)
+export type Startable = {
+  student_id: number
+  student_name: string
+  teacher_name: string
+  parent_name: string
+  open_conversation_id: number | null // 이미 열린 대화가 있으면 "시작"이 그 대화를 연다
+}
+
 export type MessageStatus = 'pending' | 'done' | 'failed' | 'skip'
 
 export type Message = {

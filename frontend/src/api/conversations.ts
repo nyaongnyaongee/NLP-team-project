@@ -1,8 +1,17 @@
 import { request } from './client'
-import type { Conversation } from './types'
+import type { Conversation, Startable } from './types'
 
 export function listConversations(): Promise<Conversation[]> {
   return request<Conversation[]>('/conversations')
+}
+
+export function listStartable(): Promise<Startable[]> {
+  return request<Startable[]>('/conversations/startable')
+}
+
+// 교사·학부모 둘 다. 열린 대화가 있으면 그 대화(200), 없으면 새로 만든다(201). 상대에게 알림이 간다.
+export function startConversation(studentId: number): Promise<Conversation> {
+  return request<Conversation>('/conversations/start', { method: 'POST', json: { student_id: studentId } })
 }
 
 export function getConversation(id: number): Promise<Conversation> {

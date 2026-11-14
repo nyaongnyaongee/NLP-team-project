@@ -24,6 +24,18 @@ class TaskPatch(BaseModel):
     status: Literal["candidate", "added", "done"] | None = None
 
 
+class ConversationStartIn(BaseModel):
+    student_id: int
+
+
+class StartableOut(BaseModel):
+    student_id: int
+    student_name: str
+    teacher_name: str
+    parent_name: str
+    open_conversation_id: int | None  # 이미 열린 대화 (있으면 「대화 시작」이 그 대화를 연다)
+
+
 class ConversationIn(BaseModel):
     parent_id: int
     student_name: str = Field(..., min_length=1, max_length=20)

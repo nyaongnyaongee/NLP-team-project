@@ -1,28 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { listConversations } from '../../api/conversations'
 import type { Conversation } from '../../api/types'
+import { useSync } from '../../realtime/useSync'
+import { useResource } from './useResource'
 
+const NONE: Conversation[] = []
+
+// 내 대화 목록. 목록에 없는 대화의 알림이 오면 (상대가 새 대화를 열었을 때) 다시 읽는다.
 export function useConversations() {
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, setData, loaded, error, refresh } = useResource(listConversations, NONE)
+  useSync('conversations', refresh, (e) => e.type === 'changed' && !data.some((c) => c.id === e.conversationId))
 
-  useEffect(() => {
-    let cancelled = false
-    listConversations()
-      .then((list) => {
-        if (!cancelled) setConversations(list)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : '불러오지 못했습니다')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return { conversations, loading, error }
+  // 방금 시작한 대화를 목록에 넣는다 (이미 있으면 그대로)
+  const add = useCallback(
+    (c: Conversation) => setData((prev) => (prev.some((p) => p.id === c.id) ? prev : [...prev, c])),
+    [setData],
+  )
+  return { conversations: data, loading: !loaded && error === null, error, add }
 }

@@ -13,6 +13,7 @@ USERS = [  # (role, name, login_id)
     ("parent", "이도윤", "parent2"),
     ("complaint_team", "정하은", "team1"),  # 민원대응팀 (신고 보고서 D 를 본다)
 ]
+SEED_CHILDREN = (("parent1", "지민"), ("parent2", "민준"))  # 학부모 ↔ 아이 (학생 이름은 ai/sample_roster.json 의 20명 중에서)
 
 with SessionLocal() as db:
     first_time = not db.execute(text("SELECT count(*) FROM users")).scalar()
@@ -27,7 +28,7 @@ with SessionLocal() as db:
         added.append(login)
     if first_time:
         ids = dict(db.execute(text("SELECT login_id, id FROM users")).all())
-        for parent, student in (("parent1", "지민"), ("parent2", "민준")):  # 학생 이름은 ai/sample_roster.json 의 20명 중에서
+        for parent, student in SEED_CHILDREN:
             db.execute(
                 text("INSERT INTO conversations (teacher_id, parent_id, student_name) VALUES (:t,:p,:s)"),
                 {"t": ids["teacher1"], "p": ids[parent], "s": student},
@@ -43,6 +44,12 @@ with SessionLocal() as db:
     db.execute(text(  # 대화 ↔ 학생 잇기 (이름이 같으면)
         "UPDATE conversations c SET student_id = s.id FROM students s "
         "WHERE c.student_id IS NULL AND s.teacher_id = c.teacher_id AND s.name = c.student_name"))
+    db.execute(text(  # 학생 ↔ 학부모: 이미 있는 대화에서
+        "UPDATE students s SET parent_id = c.parent_id FROM conversations c "
+        "WHERE s.parent_id IS NULL AND c.student_id = s.id"))
+    for parent, student in SEED_CHILDREN:  # 대화가 없어도 시드 학부모는 아이가 있게
+        db.execute(text("UPDATE students SET parent_id = (SELECT id FROM users WHERE login_id = :p) "
+                        "WHERE teacher_id = :t AND name = :n AND parent_id IS NULL"), {"p": parent, "t": teacher, "n": student})
     if new_students:
         added.append(f"학생 {new_students}명")
     db.commit()
