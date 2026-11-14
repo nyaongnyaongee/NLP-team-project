@@ -53,7 +53,8 @@ copy .env.example .env
 py dev\dev.py
 ```
 
-DB · 테이블 · 테스트 계정을 알아서 만들고 백엔드와 확인 화면을 켠 뒤 브라우저를 연다. 끄기는 `Ctrl+C`.
+DB · 테이블 · 테스트 계정을 알아서 만들고 백엔드 · 확인 화면(5173) · React 화면(5174) 을 켠 뒤 브라우저(5174)를 연다. 끄기는 `Ctrl+C`.
+React 화면은 Node.js(20.19 이상)가 있어야 켜진다 (없으면 건너뛰고 확인 화면만). `npm install` 은 알아서 한다.
 화면 사용법은 `backend/dev/README.md`. 자동 확인은 `.venv\Scripts\python -m pytest` (먼저 `.venv\Scripts\python -m pip install -r requirements-dev.txt`).
 
 ### 막혔을 때 (Windows)
@@ -64,7 +65,7 @@ DB · 테이블 · 테스트 계정을 알아서 만들고 백엔드와 확인 �
 | `PostgreSQL 이 꺼져 있습니다` | 시작 메뉴 → 「서비스」 → `postgresql-x64-16` → [시작] |
 | `PostgreSQL 에 접속하지 못했습니다` | `.env` 의 `DATABASE_URL` 비밀번호 확인. 기호(`@ : / #`)가 있으면 `%40` 처럼 바꿔 쓴다 |
 | `.env` 관련 안내가 뜬다 | `.env` 의 `DATABASE_URL` · `JWT_SECRET` 을 채웠는지 확인 |
-| `5432` · `8000` · `5173` 번 포트를 이미 쓴다 | 이미 켜져 있거나 다른 프로그램이 쓰는 중 |
+| `5432` · `8000` · `5173` · `5174` 번 포트를 이미 쓴다 | 이미 켜져 있거나 다른 프로그램이 쓰는 중 |
 | 패키지 설치 중 빌드 오류 | Python 버전이 너무 새것일 가능성. 3.12 로 `.venv` 를 다시 만든다 |
 
 ## 실행 (Mac)
@@ -77,8 +78,8 @@ python3.12 -m venv .venv                  # brew install python@3.12 (3.10 이�
 .venv/bin/python -m pip install -r requirements.txt
 cp .env.example .env                      # DATABASE_URL · JWT_SECRET 채우기 (.env.example 안내)
 
-# 켜기 (PostgreSQL 은 필요하면 알아서 켜고 Ctrl+C 로 같이 끔)
-python3 dev/dev.py
+# 켜기 (PostgreSQL · 백엔드 · 확인 화면 5173 · React 화면 5174 → 브라우저, Ctrl+C 로 같이 끔)
+python3 dev/dev.py                        # React 화면은 brew install node 가 돼 있어야 켜짐
 ```
 
 ## 확인
