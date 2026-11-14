@@ -11,7 +11,7 @@ class NoticeIn(BaseModel):
 
 
 class NoticePatch(BaseModel):
-    """보낸 것만 바꾼다 (쓰는 중인 공지만)."""
+    """보낸 필드만 바꾼다. 이미 보낸 공지도 고칠 수 있다."""
     title: str | None = Field(None, min_length=1, max_length=100)
     body: str | None = Field(None, min_length=1, max_length=5000)
 

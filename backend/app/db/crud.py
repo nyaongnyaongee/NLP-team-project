@@ -228,11 +228,11 @@ def list_parent_notices(db: Session, parent_id: int):
 
 
 def update_notice(db: Session, notice_id: int, fields: dict) -> bool:
-    """쓰는 중인 공지만 고친다. 이미 보냈으면 False."""
+    """공지를 고친다 (보낸 공지도). 없으면 False. 보낸 뒤 고치면 updated_at > sent_at 이 되어 「수정됨」으로 보인다."""
     if not fields:
         return True
     sets = ", ".join(f"{k} = :{k}" for k in fields)
-    n = db.execute(text(f"UPDATE notices SET {sets}, updated_at = now() WHERE id = :i AND status = 'draft'"),
+    n = db.execute(text(f"UPDATE notices SET {sets}, updated_at = now() WHERE id = :i"),
                    {**fields, "i": notice_id}).rowcount
     db.commit()
     return n == 1
@@ -247,8 +247,8 @@ def send_notice(db: Session, notice_id: int) -> bool:
 
 
 def delete_notice(db: Session, notice_id: int) -> bool:
-    """쓰는 중인 공지만 지운다. 이미 보냈으면 False."""
-    n = db.execute(text("DELETE FROM notices WHERE id = :i AND status = 'draft'"), {"i": notice_id}).rowcount
+    """공지를 지운다 (보낸 공지도 — 학부모 화면에서도 사라진다). 없으면 False."""
+    n = db.execute(text("DELETE FROM notices WHERE id = :i"), {"i": notice_id}).rowcount
     db.commit()
     return n == 1
 
