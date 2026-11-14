@@ -74,14 +74,13 @@ CREATE TABLE notices (
   sent_at    TIMESTAMPTZ
 );
 
--- 학생 메모: 담임만 보는 관찰 기록 (날짜 + 짧은 글 여러 개). 학부모 · 민원대응팀 · Claude 에게는 주지 않는다
-CREATE TABLE student_notes (
-  id         BIGSERIAL PRIMARY KEY,
+-- 학생 메모장: 학생 한 명에 메모장 하나 (담임이 자유롭게 적는 글 한 덩어리). 학부모 · 민원대응팀 · Claude 에게는 주지 않는다
+CREATE TABLE student_memos (
   student_id BIGINT NOT NULL REFERENCES students(id),
   teacher_id BIGINT NOT NULL REFERENCES users(id),  -- 쓴 교사 (이 사람만 본다)
-  body       TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  body       TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (student_id, teacher_id)
 );
 
 -- messages.analysis 예시 (확정 아님, 프롬프트에 따라 바뀜)

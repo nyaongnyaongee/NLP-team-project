@@ -1,4 +1,4 @@
-"""학생 명단 · 학생 메모 · 가명처리 명단 출처 — 키 없이"""
+"""학생 명단 · 학생 메모장 · 가명처리 명단 출처 — 키 없이"""
 import pytest
 from sqlalchemy import text
 
@@ -32,44 +32,43 @@ def klass(engine, ids):
         c.execute(text("UPDATE conversations SET student_id = NULL"))
         c.execute(text("DELETE FROM conversations WHERE id NOT IN (:a, :b)"),
                   {"a": ids["conv_parent1"], "b": ids["conv_parent2"]})
-        c.execute(text("DELETE FROM student_notes"))  # TRUNCATE … CASCADE 는 대화까지 지운다
+        c.execute(text("DELETE FROM student_memos"))  # TRUNCATE … CASCADE 는 대화까지 지운다
         c.execute(text("DELETE FROM students"))
         c.execute(text("DELETE FROM users WHERE login_id = 'teacher2'"))
 
 
-def test_메모_쓰기_고치기_지우기는_쓴_교사만(client, auth, klass):
+def test_메모장은_학생마다_하나_통째로_저장된다(client, auth, klass):
     h = auth("teacher1")
-    assert [(s["name"], s["note_count"]) for s in client.get("/students", headers=h).json()] == [
-        ("민재", 0), ("서윤", 0), ("학생", 0)]   # 이름 순, 다른 교사 반 학생은 없음
+    assert [(s["name"], s["has_memo"]) for s in client.get("/students", headers=h).json()] == [
+        ("민재", False), ("서윤", False), ("학생", False)]   # 이름 순, 다른 교사 반 학생은 없음
 
     sid = klass["서윤"]
-    a = client.post(f"/students/{sid}/notes", headers=h, json={"body": "  큰 소리에 놀람 — 활동 전에 미리 알려 주면 괜찮음 "})
-    b = client.post(f"/students/{sid}/notes", headers=h, json={"body": "땅콩 알레르기"})
-    assert a.status_code == b.status_code == 201 and a.json()["body"] == "큰 소리에 놀람 — 활동 전에 미리 알려 주면 괜찮음"
-    notes = client.get(f"/students/{sid}/notes", headers=h).json()
-    assert [n["body"] for n in notes] == ["땅콩 알레르기", "큰 소리에 놀람 — 활동 전에 미리 알려 주면 괜찮음"]  # 최근 것 먼저
-    assert client.get("/students", headers=h).json()[1]["note_count"] == 2
+    assert client.get(f"/students/{sid}/memo", headers=h).json() == {"student_id": sid, "body": "", "updated_at": None}
+    pad = "큰 소리에 놀람 — 활동 전에 미리 알려 주면 괜찮음\n땅콩 알레르기\n\n짝: 민재랑 잘 맞음"
+    r = client.put(f"/students/{sid}/memo", headers=h, json={"body": pad + "\n\n"})
+    assert r.status_code == 200 and r.json()["body"] == pad and r.json()["updated_at"]   # 끝 빈 줄만 정리, 줄바꿈은 그대로
+    assert client.get(f"/students/{sid}/memo", headers=h).json()["body"] == pad
+    assert client.get("/students", headers=h).json()[1]["has_memo"] is True
 
-    nid = a.json()["id"]
-    r = client.patch(f"/notes/{nid}", headers=h, json={"body": "큰 소리에 놀람"})
-    assert r.status_code == 200 and r.json()["body"] == "큰 소리에 놀람" and r.json()["updated_at"] >= r.json()["created_at"]
-    assert client.patch(f"/notes/{nid}", headers=h, json={"body": "   "}).status_code == 422
-    assert client.delete(f"/notes/{nid}", headers=h).status_code == 204
-    assert len(client.get(f"/students/{sid}/notes", headers=h).json()) == 1
+    client.put(f"/students/{sid}/memo", headers=h, json={"body": "땅콩 알레르기"})          # 덮어쓰기 (따로 쌓이지 않음)
+    assert client.get(f"/students/{sid}/memo", headers=h).json()["body"] == "땅콩 알레르기"
+    client.put(f"/students/{sid}/memo", headers=h, json={"body": ""})                      # 다 지우면 빈 메모장
+    assert client.get(f"/students/{sid}/memo", headers=h).json()["body"] == ""
+    assert client.get("/students", headers=h).json()[1]["has_memo"] is False
 
 
 def test_다른_교사_학부모_민원대응팀은_못_본다(client, auth, klass):
     sid = klass["서윤"]
-    nid = client.post(f"/students/{sid}/notes", headers=auth("teacher1"), json={"body": "비밀"}).json()["id"]
+    client.put(f"/students/{sid}/memo", headers=auth("teacher1"), json={"body": "비밀"})
     r = client.post("/auth/login", json={"login_id": "teacher2", "password": "pw1234"})
     other = {"Authorization": "Bearer " + r.json()["token"]}
-    assert client.get(f"/students/{sid}/notes", headers=other).status_code == 404
-    assert client.patch(f"/notes/{nid}", headers=other, json={"body": "x"}).status_code == 404
-    assert client.delete(f"/notes/{nid}", headers=other).status_code == 404
+    assert client.get(f"/students/{sid}/memo", headers=other).status_code == 404
+    assert client.put(f"/students/{sid}/memo", headers=other, json={"body": "x"}).status_code == 404
     assert [s["name"] for s in client.get("/students", headers=other).json()] == ["하린"]
     for who in ("parent1", "team1"):
         assert client.get("/students", headers=auth(who)).status_code == 403
-        assert client.get(f"/students/{sid}/notes", headers=auth(who)).status_code == 403
+        assert client.get(f"/students/{sid}/memo", headers=auth(who)).status_code == 403
+    assert client.get(f"/students/{sid}/memo", headers=auth("teacher1")).json()["body"] == "비밀"
 
 
 def test_대화를_만들면_반_학생과_이어진다(client, auth, ids, klass):

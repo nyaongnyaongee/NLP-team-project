@@ -1,4 +1,4 @@
-# 학생 · 학생 메모 요청·응답 형식  [채원 + 어령]  (시험용으로 재관이 채움)
+# 학생 · 학생 메모장 요청·응답 형식  [채원 + 어령]  (시험용으로 재관이 채움)
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -7,16 +7,14 @@ from pydantic import BaseModel, Field
 class StudentOut(BaseModel):
     id: int
     name: str
-    note_count: int  # 내가 쓴 메모 수
+    has_memo: bool  # 내 메모장에 무엇이든 적혀 있는지
 
 
-class NoteIn(BaseModel):
-    body: str = Field(..., min_length=1, max_length=2000)
+class MemoIn(BaseModel):
+    body: str = Field(..., max_length=20000)  # 메모장 전체. 빈 글이면 비운다
 
 
-class NoteOut(BaseModel):
-    id: int
+class MemoOut(BaseModel):
     student_id: int
     body: str
-    created_at: datetime
-    updated_at: datetime
+    updated_at: datetime | None  # 한 번도 안 적었으면 null
