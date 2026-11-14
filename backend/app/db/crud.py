@@ -105,6 +105,20 @@ def create_conversation(db: Session, teacher_id: int, parent_id: int, student_na
     return row
 
 
+def startable_students(db: Session, user: dict):
+    """대화를 시작할 수 있는 학생 (학부모가 등록된 학생만). 교사 = 자기 반, 학부모 = 자기 아이.
+    open_conversation_id = 이 학생 · 학부모 · 담임의 열린 대화 (없으면 NULL)."""
+    who = "s.teacher_id" if user["role"] == "teacher" else "s.parent_id"
+    return db.execute(text(
+        "SELECT s.id AS student_id, s.name AS student_name, s.teacher_id, t.name AS teacher_name, "
+        "       s.parent_id, p.name AS parent_name, "
+        "       (SELECT c.id FROM conversations c WHERE c.teacher_id = s.teacher_id AND c.parent_id = s.parent_id "
+        "          AND (c.student_id = s.id OR c.student_name = s.name) AND c.status = 'open' "
+        "        ORDER BY c.id DESC LIMIT 1) AS open_conversation_id "
+        "FROM students s JOIN users t ON t.id = s.teacher_id JOIN users p ON p.id = s.parent_id "
+        f"WHERE {who} = :u ORDER BY s.name"), {"u": user["id"]}).mappings().all()
+
+
 def set_conversation_status(db: Session, conv_id: int, status: str):
     """open | closed. 닫으면 추출 상태를 pending 으로 둔다 (같은 줄에서 바꿔야 화면이 「추출 중」을 바로 본다)."""
     extract = "CAST('{\"status\": \"pending\"}' AS JSONB)" if status == "closed" else "extract"

@@ -5,7 +5,7 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.ai.extract import KST, extract_tasks
@@ -17,7 +17,7 @@ from app.routers import drafts as drafts_router
 from app.routers import messages as messages_router
 from app.routers import reports as reports_router
 from app.routers.ws import hub
-from app.schemas.todo import ConversationIn
+from app.schemas.todo import ConversationIn, ConversationStartIn, StartableOut
 
 log = logging.getLogger("routers.conversations")
 router = APIRouter(tags=["conversations"])
@@ -71,6 +71,31 @@ def _extract_in_background(conv_id: int) -> None:
 @router.get("/conversations")
 def my_conversations(db: Session = Depends(get_db), user=Depends(current_user)):
     return [_conv_view(c, user) for c in crud.list_conversations(db, user["id"])]
+
+
+@router.get("/conversations/startable", response_model=list[StartableOut])
+def startable(db: Session = Depends(get_db), user=Depends(current_user)):
+    """대화를 시작할 수 있는 학생. 교사 = 반 학생 중 학부모가 등록된 학생, 학부모 = 자기 아이."""
+    if user["role"] not in ("teacher", "parent"):
+        raise HTTPException(403, "교사 · 학부모만 대화를 시작할 수 있습니다")
+    return [dict(r) for r in crud.startable_students(db, user)]
+
+
+@router.post("/conversations/start")
+def start_conversation(body: ConversationStartIn, response: Response, db: Session = Depends(get_db),
+                       user=Depends(current_user)):
+    """학생 하나로 대화 시작 (교사 · 학부모 둘 다). 열린 대화가 있으면 그것을 돌려주고(200), 없으면 만든다(201)."""
+    if user["role"] not in ("teacher", "parent"):
+        raise HTTPException(403, "교사 · 학부모만 대화를 시작할 수 있습니다")
+    row = next((r for r in crud.startable_students(db, user) if r["student_id"] == body.student_id), None)
+    if row is None:
+        raise HTTPException(404, "대화를 시작할 수 있는 학생이 아닙니다 (학부모가 등록되지 않았거나 내 학생이 아님)")
+    if row["open_conversation_id"] is not None:
+        return _conv_view(crud.get_conversation(db, row["open_conversation_id"]), user)
+    conv = crud.create_conversation(db, row["teacher_id"], row["parent_id"], row["student_name"])
+    hub.notify_conversation(conv["id"])  # 상대 화면의 대화 목록도 다시 불러오게
+    response.status_code = 201
+    return _conv_view(conv, user)
 
 
 @router.get("/conversations/{conv_id}")

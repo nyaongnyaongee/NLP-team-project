@@ -14,6 +14,7 @@ CREATE TABLE students (
   id         BIGSERIAL PRIMARY KEY,
   teacher_id BIGINT NOT NULL REFERENCES users(id),
   name       TEXT NOT NULL,                 -- 이름만 (성 없이, 가명처리 명단과 같게)
+  parent_id  BIGINT REFERENCES users(id),   -- 학부모 (없으면 NULL — 대화를 시작할 수 없을 뿐)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (teacher_id, name)
 );

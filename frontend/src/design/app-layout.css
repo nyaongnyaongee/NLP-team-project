@@ -150,3 +150,19 @@ ul.plain-list {
 .msg-actions {
   margin-top: 8px;
 }
+
+/* 대화 시작 (교사 「새 대화」, 학부모 「선생님께 문의하기」) */
+.start-conversation {
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  padding: 14px;
+  margin: 14px 0;
+  background: var(--light-blue);
+}
+.start-conversation h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.start-conversation .row:disabled {
+  opacity: 0.6;
+}

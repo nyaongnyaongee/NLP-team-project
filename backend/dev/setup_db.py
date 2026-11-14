@@ -72,6 +72,7 @@ UPGRADES = [
       UNIQUE (teacher_id, name)
     )""",
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS student_id BIGINT REFERENCES students(id)",
+    "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_id BIGINT REFERENCES users(id)",  # 학생 ↔ 학부모 (대화 시작)
     # 학생 메모장 (PR #15 의 student_notes = 메모 여러 개 → 학생마다 메모장 하나). 예전 메모는 오래된 것부터 이어 붙여 옮긴다
     """CREATE TABLE IF NOT EXISTS student_memos (
       student_id BIGINT NOT NULL REFERENCES students(id),
