@@ -54,7 +54,7 @@ export default function TeacherNoticeRow({
   }
 
   const onSend = () => {
-    if (!window.confirm(`"${notice.title}" 공지를 게시할까요? 게시하면 학부모에게 바로 보여요. 게시한 뒤에도 고치거나 지울 수 있어요.`)) return
+    if (!window.confirm(`"${notice.title}" 공지를 게시할까요? 게시하면 반 학부모 모두에게 바로 보여요. 게시한 뒤에도 고치거나 지울 수 있어요.`)) return
     void run(async () => onChanged(await sendNotice(notice.id)))
   }
 

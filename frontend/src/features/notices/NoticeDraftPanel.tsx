@@ -65,9 +65,9 @@ export default function NoticeDraftPanel({
       )}
       {checks && (
         <DraftChecks items={checks}>
-          {/* 공지는 그 교사와 대화가 있는 학부모 모두에게 간다 (서버 notices.py) */}
+          {/* 공지는 반 학생의 학부모 모두에게 간다 (서버 crud.notice_recipients) */}
           <p>
-            <strong>이 공지는 모든 학부모에게 보내져요.</strong> 학생 이름이나 개인 사정이 들어 있으면 모두에게 해당하는
+            <strong>이 공지는 반 학부모 모두에게 보내져요.</strong> 학생 이름이나 개인 사정이 들어 있으면 모두에게 해당하는
             공통 안내로 고쳐 주세요.
           </p>
         </DraftChecks>

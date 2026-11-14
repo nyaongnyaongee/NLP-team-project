@@ -1,6 +1,6 @@
 # 공지사항  [채원]  (시험용으로 재관이 채움)
 # 교사: 쓰기(draft) → 고치기 → [보내기](sent). 보낸 공지도 고치거나 지울 수 있다 (학부모에게 알림). 다시 보내기만 안 됨.
-# 받는 사람 = 그 교사와 대화가 있는 학부모 전부 (DB 에 「반」 이 없어서). 학부모는 보낸 공지만 본다.
+# 받는 사람 = 반 학생(students.parent_id)의 학부모 전원 + 그 교사와 대화가 있는 학부모. 학부모는 보낸 공지만 본다.
 # 초안(Claude)은 POST /drafts/notice — 여기서는 저장 · 보내기만 한다.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -92,7 +92,7 @@ def delete_notice(notice_id: int, db: Session = Depends(get_db), user=Depends(cu
 
 @router.post("/notices/{notice_id}/send", response_model=NoticeOut)
 def send_notice(notice_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
-    """보내기: 그 교사와 대화가 있는 학부모 모두에게 보인다. 실시간 연결이 있으면 알림(번호만)."""
+    """보내기: 반 학부모 모두에게 보인다 (crud.notice_recipients). 실시간 연결이 있으면 알림(번호만)."""
     _need_teacher(user)
     _not_sent(_my_notice(db, notice_id, user))
     if not crud.send_notice(db, notice_id):

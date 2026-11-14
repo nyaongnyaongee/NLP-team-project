@@ -588,7 +588,7 @@ function panel(title, defaultLogin) {
   };
   q(".nsend").onclick = async () => {
     q(".err").textContent = "";
-    if (!confirm("대화가 있는 학부모 모두에게 보냅니다. 보낼까요?")) return;
+    if (!confirm("반 학부모 모두에게 보냅니다. 보낼까요?")) return;
     const b = q(".nsend"); b.disabled = true;
     try {
       const n = await saveNotice();

@@ -62,7 +62,7 @@ CREATE TABLE tasks (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 공지: 교사가 쓰고(draft) [보내기] 하면 sent. 받는 사람 = 그 교사와 대화가 있는 학부모 전부 (반 테이블이 없어서)
+-- 공지: 교사가 쓰고(draft) [보내기] 하면 sent. 받는 사람 = 반 학생(students)의 학부모 전원 + 그 교사와 대화가 있는 학부모
 -- 보낸 공지도 고치거나 지울 수 있다 (updated_at > sent_at 이면 「수정됨」). 다시 보내기만 안 됨
 CREATE TABLE notices (
   id         BIGSERIAL PRIMARY KEY,

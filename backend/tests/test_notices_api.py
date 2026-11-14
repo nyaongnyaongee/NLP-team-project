@@ -103,7 +103,7 @@ def test_학부모는_쓰거나_보낼_수_없고_쓰는_중인_공지도_못_�
     assert client.get(f"/notices/{n['id']}", headers=p).status_code == 404
 
 
-def test_대화가_없는_학부모는_공지를_못_받는다(client, auth, engine, sent_to):
+def test_반_학생도_대화도_없는_학부모는_공지를_못_받는다(client, auth, engine, sent_to):
     from app.core.auth import hash_password
     with engine.begin() as c:
         c.execute(text("INSERT INTO users (role,name,login_id,password_hash) VALUES ('parent','최하늘','parent9',:p) "
@@ -111,6 +111,26 @@ def test_대화가_없는_학부모는_공지를_못_받는다(client, auth, eng
     n = make(client, auth)
     client.post(f"/notices/{n['id']}/send", headers=auth("teacher1"))
     assert client.get("/notices", headers=auth("parent9")).json() == []
+
+
+def test_대화가_없어도_반_학생_학부모는_공지를_받는다(client, auth, engine, ids, sent_to):
+    from app.core.auth import hash_password
+    with engine.begin() as c:
+        p = c.execute(text("INSERT INTO users (role,name,login_id,password_hash) VALUES ('parent','윤미경','parent7',:p) "
+                           "RETURNING id"), {"p": hash_password("pw1234")}).scalar()
+        c.execute(text("INSERT INTO students (teacher_id, name, parent_id) VALUES (:t, '도윤', :p)"),
+                  {"t": ids["teacher1"], "p": p})
+    try:
+        n = make(client, auth)
+        client.post(f"/notices/{n['id']}/send", headers=auth("teacher1"))
+        assert [x["id"] for x in client.get("/notices", headers=auth("parent7")).json()] == [n["id"]]
+        # 반 학부모(parent7) + 대화가 있는 학부모(parent1 · parent2) + 교사, 겹치지 않게
+        assert sent_to == [(sorted([p, ids["parent1"], ids["parent2"], ids["teacher1"]]),
+                            {"type": "notice", "notice_id": n["id"]})]
+    finally:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM students WHERE parent_id = :p"), {"p": p})
+            c.execute(text("DELETE FROM users WHERE id = :p"), {"p": p})
 
 
 def test_빈_제목은_안_된다(client, auth):

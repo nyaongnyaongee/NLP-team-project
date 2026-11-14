@@ -20,7 +20,7 @@ export async function deleteNotice(id: number): Promise<void> {
   await request<null>(`/notices/${id}`, { method: 'DELETE' })
 }
 
-// 게시: 그 교사와 대화가 있는 학부모 모두에게 보이게 된다. 다시 게시하면 409.
+// 게시: 반 학생의 학부모 모두에게 보이게 된다 (+ 대화가 있는 학부모). 다시 게시하면 409.
 export function sendNotice(id: number): Promise<Notice> {
   return request<Notice>(`/notices/${id}/send`, { method: 'POST' })
 }
