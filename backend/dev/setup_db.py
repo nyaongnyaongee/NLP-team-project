@@ -42,7 +42,7 @@ def main():
         raw.cursor().execute(SCHEMA.read_text(encoding="utf-8"))
         raw.commit()
         raw.close()
-        print("테이블 만듦 (users · students · conversations · messages · tasks · notices · student_notes)")
+        print("테이블 만듦 (users · students · conversations · messages · tasks · notices · student_memos)")
     else:
         _upgrade(eng)
 
@@ -72,14 +72,23 @@ UPGRADES = [
       UNIQUE (teacher_id, name)
     )""",
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS student_id BIGINT REFERENCES students(id)",
-    """CREATE TABLE IF NOT EXISTS student_notes (
-      id         BIGSERIAL PRIMARY KEY,
+    # 학생 메모장 (PR #15 의 student_notes = 메모 여러 개 → 학생마다 메모장 하나). 예전 메모는 오래된 것부터 이어 붙여 옮긴다
+    """CREATE TABLE IF NOT EXISTS student_memos (
       student_id BIGINT NOT NULL REFERENCES students(id),
       teacher_id BIGINT NOT NULL REFERENCES users(id),
-      body       TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      body       TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (student_id, teacher_id)
     )""",
+    """DO $$ BEGIN
+      IF to_regclass('public.student_notes') IS NOT NULL THEN
+        INSERT INTO student_memos (student_id, teacher_id, body, updated_at)
+          SELECT student_id, teacher_id, string_agg(body, E'\n' ORDER BY created_at, id), max(updated_at)
+          FROM student_notes GROUP BY student_id, teacher_id
+          ON CONFLICT DO NOTHING;
+        DROP TABLE student_notes;
+      END IF;
+    END $$""",
 ]
 
 

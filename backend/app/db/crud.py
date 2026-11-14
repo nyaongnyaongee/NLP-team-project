@@ -313,43 +313,26 @@ def get_student(db: Session, student_id: int):
     return db.execute(text("SELECT * FROM students WHERE id = :i"), {"i": student_id}).mappings().first()
 
 
-def list_notes(db: Session, student_id: int, teacher_id: int):
-    """최근 것 먼저."""
-    return db.execute(
-        text("SELECT * FROM student_notes WHERE student_id = :s AND teacher_id = :t ORDER BY created_at DESC, id DESC"),
-        {"s": student_id, "t": teacher_id},
-    ).mappings().all()
+def get_memo(db: Session, student_id: int, teacher_id: int):
+    return db.execute(text("SELECT * FROM student_memos WHERE student_id = :s AND teacher_id = :t"),
+                      {"s": student_id, "t": teacher_id}).mappings().first()
 
 
-def note_counts(db: Session, teacher_id: int) -> dict[int, int]:
-    rows = db.execute(text("SELECT student_id, count(*) FROM student_notes WHERE teacher_id = :t GROUP BY student_id"),
-                      {"t": teacher_id}).all()
-    return {r[0]: r[1] for r in rows}
+def memo_students(db: Session, teacher_id: int) -> set[int]:
+    """메모장에 무엇이든 적힌 학생 id."""
+    rows = db.execute(text("SELECT student_id FROM student_memos WHERE teacher_id = :t AND body <> ''"), {"t": teacher_id}).all()
+    return {r[0] for r in rows}
 
 
-def create_note(db: Session, student_id: int, teacher_id: int, body: str):
+def save_memo(db: Session, student_id: int, teacher_id: int, body: str):
+    """메모장 통째로 저장 (없으면 만든다). 빈 글이면 비운 채로 둔다."""
     row = db.execute(
-        text("INSERT INTO student_notes (student_id, teacher_id, body) VALUES (:s, :t, :b) RETURNING *"),
+        text("INSERT INTO student_memos (student_id, teacher_id, body) VALUES (:s, :t, :b) "
+             "ON CONFLICT (student_id, teacher_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now() RETURNING *"),
         {"s": student_id, "t": teacher_id, "b": body},
     ).mappings().first()
     db.commit()
     return row
-
-
-def get_note(db: Session, note_id: int):
-    return db.execute(text("SELECT * FROM student_notes WHERE id = :i"), {"i": note_id}).mappings().first()
-
-
-def update_note(db: Session, note_id: int, body: str):
-    row = db.execute(text("UPDATE student_notes SET body = :b, updated_at = now() WHERE id = :i RETURNING *"),
-                     {"b": body, "i": note_id}).mappings().first()
-    db.commit()
-    return row
-
-
-def delete_note(db: Session, note_id: int) -> None:
-    db.execute(text("DELETE FROM student_notes WHERE id = :i"), {"i": note_id})
-    db.commit()
 
 
 # ---- 시험용 초기화 (/dev/reset)
