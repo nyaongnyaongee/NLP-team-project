@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ConversationList from '../chat/ConversationList'
 import StartConversation from '../chat/StartConversation'
 import { useConversations } from '../chat/useConversations'
 import TeacherThread from './TeacherThread'
@@ -62,25 +63,7 @@ export default function ConversationsTab() {
           <div className="big">▤</div>아직 대화가 없어요. 「＋ 새 대화」로 학부모와 대화를 시작하세요
         </div>
       )}
-      {/* 대화 목록은 학생 이름으로 표시한다 (중대 3) */}
-      <ul className="plain-list">
-        {conversations.map((c) => (
-          <li key={c.id}>
-            <button type="button" className="row" onClick={() => select(c.id)} aria-pressed={c.id === selectedId}>
-              <span className="avatar">{c.student_name.slice(0, 1)}</span>
-              <span className="row-main">
-                <span className="row-title">
-                  <b>{c.student_name}</b>
-                </span>
-                <span className="tag">{c.status === 'closed' ? '대화 종료' : '대화 중'}</span>
-              </span>
-              <span className="muted" aria-hidden="true">
-                ›
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <ConversationList conversations={conversations} onSelect={select} />
     </section>
   )
 }

@@ -6,10 +6,10 @@ import { useResource } from './useResource'
 
 const NONE: Conversation[] = []
 
-// 내 대화 목록. 목록에 없는 대화의 알림이 오면 (상대가 새 대화를 열었을 때) 다시 읽는다.
+// 내 대화 목록. 대화 알림이 오면 다시 읽는다 (상대가 새 대화를 열었을 때, 마지막 메시지 시각 · 순서가 바뀔 때).
 export function useConversations() {
   const { data, setData, loaded, error, refresh } = useResource(listConversations, NONE)
-  useSync('conversations', refresh, (e) => e.type === 'changed' && !data.some((c) => c.id === e.conversationId))
+  useSync('conversations', refresh, (e) => e.type === 'changed')
 
   // 방금 시작한 대화를 목록에 넣는다 (이미 있으면 그대로)
   const add = useCallback(

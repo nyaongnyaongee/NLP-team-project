@@ -9,7 +9,7 @@ export function listStartable(): Promise<Startable[]> {
   return request<Startable[]>('/conversations/startable')
 }
 
-// 교사·학부모 둘 다. 열린 대화가 있으면 그 대화(200), 없으면 새로 만든다(201). 상대에게 알림이 간다.
+// 교사·학부모 둘 다. 문의마다 새 대화방을 만든다(201). 상대에게 알림이 간다.
 export function startConversation(studentId: number): Promise<Conversation> {
   return request<Conversation>('/conversations/start', { method: 'POST', json: { student_id: studentId } })
 }

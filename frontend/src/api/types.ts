@@ -12,6 +12,7 @@ export type Conversation = {
   status: 'open' | 'closed'
   extract?: { status: 'pending' | 'done' | 'failed'; error?: string; count?: number; at?: string } | null // 교사에게만 옴
   created_at: string
+  last_message_at?: string | null // 목록에서만 옴. 마지막 메시지 시각 (없으면 null)
   // report, reported_at 은 선언하지 않는다 (치명 2)
 }
 
@@ -21,7 +22,6 @@ export type Startable = {
   student_name: string
   teacher_name: string
   parent_name: string
-  open_conversation_id: number | null // 이미 열린 대화가 있으면 "시작"이 그 대화를 연다
 }
 
 export type MessageStatus = 'pending' | 'done' | 'failed' | 'skip'
