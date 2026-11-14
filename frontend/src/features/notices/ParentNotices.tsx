@@ -6,12 +6,13 @@ import { useNoticeSync } from '../../realtime/useNoticeSync'
 import { formatTime } from '../chat/formatTime'
 import { useResource } from '../chat/useResource'
 import NoticeView from './NoticeView'
+import { editedAfterSend } from './noticeEdited'
 
 const NO_NOTICES: Notice[] = []
 const BASE = '/parent/notices'
 
 // 학부모 "공지사항" 탭: 게시된 공지의 목록과 상세.
-// 목록(본문 포함)을 한 번 읽어 상세도 거기서 찾는다. 게시 알림이 오면 목록을 다시 읽는다.
+// 목록(본문 포함)을 한 번 읽어 상세도 거기서 찾는다. 게시·수정·삭제 알림이 오면 목록을 다시 읽는다.
 export default function ParentNotices() {
   const { data, loaded, error, refresh } = useResource(listNotices, NO_NOTICES)
   useNoticeSync(refresh)
@@ -40,7 +41,7 @@ export default function ParentNotices() {
                     <span className="tag">학급 공지</span>
                     <h3>{n.title}</h3>
                     <p>{n.body}</p>
-                    {n.sent_at && <small>{formatTime(n.sent_at)}</small>}
+                    {n.sent_at && <small>{formatTime(n.sent_at)}{editedAfterSend(n) && ' · 수정됨'}</small>}
                   </Link>
                   <div className="notice-foot">
                     <Link className="notice-detail" to={`${BASE}/${n.id}`}>

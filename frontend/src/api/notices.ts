@@ -10,17 +10,17 @@ export function createNotice(input: { title: string; body: string }): Promise<No
   return request<Notice>('/notices', { method: 'POST', json: input })
 }
 
-// 초안만 고칠 수 있다. 게시된 공지는 서버가 409 로 막는다 (detail 문장을 그대로 안내한다).
+// 초안도 게시된 공지도 고칠 수 있다. 게시된 공지를 고치면 학부모에게 알림이 가고 updated_at > sent_at 이 된다(수정됨).
 export function updateNotice(id: number, patch: { title?: string; body?: string }): Promise<Notice> {
   return request<Notice>(`/notices/${id}`, { method: 'PATCH', json: patch })
 }
 
-// 초안만 지울 수 있다 (게시된 공지는 409). 서버는 204(본문 없음)를 돌려준다.
+// 게시된 공지도 지울 수 있다 (학부모 화면에서도 사라진다). 서버는 204(본문 없음)를 돌려준다.
 export async function deleteNotice(id: number): Promise<void> {
   await request<null>(`/notices/${id}`, { method: 'DELETE' })
 }
 
-// 게시: 그 교사와 대화가 있는 학부모 모두에게 보이게 된다.
+// 게시: 그 교사와 대화가 있는 학부모 모두에게 보이게 된다. 다시 게시하면 409.
 export function sendNotice(id: number): Promise<Notice> {
   return request<Notice>(`/notices/${id}/send`, { method: 'POST' })
 }

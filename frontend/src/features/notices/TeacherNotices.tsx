@@ -4,7 +4,6 @@ import { listNotices } from '../../api/notices'
 import type { Notice } from '../../api/types'
 import { useResource } from '../chat/useResource'
 import NoticeEditor from './NoticeEditor'
-import NoticeView from './NoticeView'
 import TeacherNoticeRow from './TeacherNoticeRow'
 
 const NO_NOTICES: Notice[] = []
@@ -22,7 +21,7 @@ export default function TeacherNotices() {
   const remove = (id: number) => setData((prev) => prev.filter((p) => p.id !== id))
   const onConflict = () => void refresh() // 게시 여부가 서버와 어긋났으니 다시 읽는다
 
-  // 수정 화면에서 409 를 받으면 다시 읽은 목록 때문에 화면이 읽기 전용으로 바뀐다.
+  // 수정 화면에서 409 를 받으면 목록을 다시 읽는다.
   // 서버의 detail 문장이 사라지지 않도록 그 주소에 머무는 동안 계속 보여 준다 (명세 S6).
   const location = useLocation()
   const [conflict, setConflict] = useState<{ message: string; path: string } | null>(null)
@@ -95,7 +94,7 @@ export default function TeacherNotices() {
   )
 }
 
-// 공지 하나: 초안이면 수정 화면, 게시된 공지면 읽기 전용 (수정·삭제 버튼 없음).
+// 공지 하나: 초안도 게시된 공지도 수정 화면 (게시된 공지는 저장하면 학부모 화면에 바로 반영).
 function NoticeDetail({
   notices,
   loading,
@@ -119,16 +118,6 @@ function NoticeDetail({
           ‹ 공지사항
         </Link>
         <p className="alert" role="alert">찾을 수 없습니다</p>
-      </div>
-    )
-  }
-  if (notice.status === 'sent') {
-    return (
-      <div>
-        <Link className="back" to={BASE}>
-          ‹ 공지사항
-        </Link>
-        <NoticeView notice={notice} />
       </div>
     )
   }
