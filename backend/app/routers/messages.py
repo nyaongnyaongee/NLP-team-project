@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.ai.refine import refine_message
-from app.ai.roster import load_sample_roster
+from app.ai.roster import class_roster
 from app.core.auth import current_user
 from app.core.config import settings
 from app.db import crud
@@ -75,7 +75,7 @@ def _result_for_storage(result: dict) -> dict:
 
 def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
     """응답을 보낸 뒤 돌아간다 (요청의 DB 연결은 이미 닫혔으니 직접 연다).
-    명단(시연용 고정): 학생 = ai/sample_roster.json 20명, 어른 = 교사 · 학부모 실명(DB users)."""
+    명단: 학생 = 그 담임의 반(students, 비어 있으면 ai/sample_roster.json) + 이 대화의 학생, 어른 = 교사 · 학부모 실명(DB users)."""
     try:
         if not _refine_state["enabled"]:  # 꺼져 있으면 Claude 를 부르지 않는다. 켠 뒤 「다시 정제」로 정제할 수 있다
             result = {"status": "failed", "refined_text": None, "analysis": None,
@@ -83,7 +83,9 @@ def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
         else:
             with SessionLocal() as db:
                 adults = crud.adult_names(db)
-            result = refine_message(raw_text, load_sample_roster(), adults)  # 몇 초 걸리므로 DB 연결을 잡고 있지 않는다
+                conv = crud.get_conversation(db, conv_id)
+                roster = class_roster(crud.student_names(db, conv["teacher_id"]), conv["student_name"])
+            result = refine_message(raw_text, roster, adults)  # 몇 초 걸리므로 DB 연결을 잡고 있지 않는다
     except Exception as e:  # 명단 조회 등 예기치 못한 오류도 pending 으로 멈추지 않게 실패로 기록
         log.exception("정제 준비 중 오류")
         result = {"status": "failed", "refined_text": None, "analysis": None, "error": f"정제 중 오류 ({type(e).__name__})"}

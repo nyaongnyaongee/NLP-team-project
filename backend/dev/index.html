@@ -87,6 +87,10 @@
   .rmsg { font-size:12px; white-space:pre-wrap; padding:2px 0; border-bottom:1px dashed var(--line); }
   .rmsg.hit { background:rgba(220,38,38,.08); }
   .rsum { white-space:pre-wrap; font-size:13px; margin-top:4px; }
+  .snote { border:1px solid var(--line); border-radius:8px; padding:4px 8px; font-size:13px; display:flex; gap:6px; align-items:flex-start; }
+  .snote .b { flex:1; white-space:pre-wrap; min-width:0; }
+  .snote .meta { flex:none; margin:0; }
+  .snote button { padding:1px 7px; font-size:12px; flex:none; background:transparent; color:var(--mute); border:1px solid var(--line); }
   .link { margin-top:6px; padding:2px 8px; font-size:12px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:6px; cursor:pointer; }
 </style>
 </head>
@@ -127,6 +131,12 @@ function panel(title, defaultLogin) {
       <button class="send" disabled>보내기</button>
     </div>
     <div class="tools" hidden>
+      <details class="snotes" hidden>
+        <summary>학생 메모</summary>
+        <div class="row"><textarea class="snew" rows="2" placeholder="담임만 보는 기록. 예: 큰 소리에 놀람 — 활동 전에 미리 알려 주면 괜찮음 (학부모 · Claude 에게 안 감)"></textarea>
+          <button class="sadd">적기</button></div>
+        <div class="nlist slist"></div>
+      </details>
       <div class="row">
         <input class="memo" placeholder="답장에 담을 내용 (예: 보건실 다녀옴, 체육 선생님께 전달함) — 비워도 됨">
         <button class="draft">메모로 초안 쓰기</button>
@@ -166,6 +176,7 @@ function panel(title, defaultLogin) {
   let busy = false, again = false;          // 새로 읽기가 겹치지 않게
   let noticeId = null;                      // 교사가 고치고 있는 공지 (null = 새 공지)
   let seenNotices = null;                   // 학부모: 이미 본 공지 id (띵 판단용)
+  let notesFor = undefined;                 // 학생 메모를 보여 주고 있는 학생 id (바뀔 때만 다시 읽음)
   let seenReports = null;                   // 민원대응팀: 신고 id → 상태 (띵 판단용)
 
   async function api(path, opt = {}) {
@@ -320,7 +331,7 @@ function panel(title, defaultLogin) {
       sel.hidden = convs.length < 2;
       sel.onchange = () => {
         convId = +sel.value; seen = null; q(".reply-checks").innerHTML = "";
-        q(".text").value = ""; q(".memo").value = ""; q(".rmemo").value = "";  // 쓰던 글이 다른 학부모에게 가지 않게
+        q(".text").value = ""; q(".memo").value = ""; q(".rmemo").value = ""; q(".snew").value = "";  // 쓰던 글이 다른 학부모에게 가지 않게
         refresh();
       };
       q(".who").textContent = `${res.name} (${res.role})`;
@@ -329,7 +340,7 @@ function panel(title, defaultLogin) {
       q(".text").disabled = q(".send").disabled = false;
       q(".tools").hidden = res.role !== "teacher";
       q(".pnotices").hidden = res.role === "teacher";
-      seenNotices = null; noticeId = null;
+      seenNotices = null; noticeId = null; notesFor = undefined;
       loadNotices();
       clearInterval(timer);
       seen = null;
@@ -379,7 +390,49 @@ function panel(title, defaultLogin) {
       : x.status === "failed" ? "뽑지 못했습니다: " + x.error : x.status === "done" ? `후보 ${x.count}개` : "";
     st.style.color = x.status === "failed" ? "#dc2626" : "";
     showReport(conv);
+    if (conv.student_id !== notesFor) { notesFor = conv.student_id; loadStudentNotes(); }
   }
+
+  // 학생 메모: 담임만 보는 관찰 기록. 대화가 반 명단의 학생과 이어져 있을 때만 (student_id)
+  async function loadStudentNotes() {
+    const box = q(".snotes"), list = q(".slist"), sid = notesFor;
+    box.hidden = !sid;
+    if (!sid) return;
+    try {
+      const [notes, students] = await Promise.all([api(`/students/${sid}/notes`), api("/students")]);
+      if (sid !== notesFor) return;  // 그사이 대화를 바꿨으면 버림
+      const st = students.find(x => x.id === sid);
+      q(".snotes summary").textContent = `학생 메모 · ${st ? st.name : ""} (${notes.length})`;
+      list.innerHTML = notes.length ? "" : '<div class="empty" style="margin:4px 0">아직 메모가 없습니다</div>';
+      for (const n of notes) {
+        const row = mk("div", "snote");
+        row.appendChild(mk("span", "meta", when(n.created_at)));
+        row.appendChild(mk("span", "b", n.body));
+        const e = mk("button", "", "고치기");
+        e.onclick = async () => {
+          const body = prompt("메모 고치기", n.body);
+          if (body === null || !body.trim()) return;
+          try { await api(`/notes/${n.id}`, { method: "PATCH", body: JSON.stringify({ body }) }); } catch (err) { q(".err").textContent = err.message; }
+          loadStudentNotes();
+        };
+        const x = mk("button", "", "지우기");
+        x.onclick = async () => {
+          if (!confirm("이 메모를 지울까요?")) return;
+          try { await api(`/notes/${n.id}`, { method: "DELETE" }); } catch (err) { q(".err").textContent = err.message; }
+          loadStudentNotes();
+        };
+        row.appendChild(e); row.appendChild(x);
+        list.appendChild(row);
+      }
+    } catch (e) { q(".err").textContent = e.message; }
+  }
+  q(".sadd").onclick = async () => {
+    const body = q(".snew").value.trim();
+    if (!body || !notesFor) return;
+    try { await api(`/students/${notesFor}/notes`, { method: "POST", body: JSON.stringify({ body }) }); q(".snew").value = ""; }
+    catch (e) { q(".err").textContent = e.message; }
+    loadStudentNotes();
+  };
 
   // 신고(D): 담임에게는 요약 · 심각도만 (원문 인용은 서버가 뺌). 민원대응팀은 아래 loadReports 에서 전부
   function showReport(conv) {

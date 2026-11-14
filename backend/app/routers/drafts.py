@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai.draft import draft_notice, draft_reply
-from app.ai.roster import load_sample_roster
+from app.ai.roster import class_roster
 from app.core.auth import current_user
 from app.db import crud
 from app.db.database import get_db
@@ -70,8 +70,9 @@ def make_reply_draft(conv_id: int, body: ReplyDraftIn, db: Session = Depends(get
         raise HTTPException(409, "답장할 학부모 메시지가 없습니다 (처리 완료된 메시지가 있어야 합니다)")
     _need_claude()
     adults = crud.adult_names(db)
+    roster = class_roster(crud.student_names(db, conv["teacher_id"]), conv["student_name"])
     db.close()  # Claude 를 기다리는 동안 DB 연결을 잡고 있지 않는다
-    result = draft_reply(history, body.memo, load_sample_roster(), adults)
+    result = draft_reply(history, body.memo, roster, adults)
     if result["status"] != "done":
         raise HTTPException(502, "초안을 만들지 못했습니다: " + result["error"])
     return {"draft": result["draft"], "check": result["check"]}
@@ -83,8 +84,9 @@ def make_notice_draft(body: NoticeDraftIn, db: Session = Depends(get_db), user=D
     _need_teacher(user)
     _need_claude()
     adults = crud.adult_names(db)
+    roster = class_roster(crud.student_names(db, user["id"]))
     db.close()
-    result = draft_notice(body.points, load_sample_roster(), adults)
+    result = draft_notice(body.points, roster, adults)
     if result["status"] != "done":
         raise HTTPException(502, "초안을 만들지 못했습니다: " + result["error"])
     return {"title": result["title"], "body": result["body"], "check": result["check"]}

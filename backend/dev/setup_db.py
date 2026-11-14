@@ -42,7 +42,7 @@ def main():
         raw.cursor().execute(SCHEMA.read_text(encoding="utf-8"))
         raw.commit()
         raw.close()
-        print("테이블 만듦 (users · conversations · messages · tasks · notices)")
+        print("테이블 만듦 (users · students · conversations · messages · tasks · notices · student_notes)")
     else:
         _upgrade(eng)
 
@@ -62,6 +62,23 @@ UPGRADES = [
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       sent_at    TIMESTAMPTZ
+    )""",
+    # 학생 · 학생 메모 (schema.sql 의 것과 같게)
+    """CREATE TABLE IF NOT EXISTS students (
+      id         BIGSERIAL PRIMARY KEY,
+      teacher_id BIGINT NOT NULL REFERENCES users(id),
+      name       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (teacher_id, name)
+    )""",
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS student_id BIGINT REFERENCES students(id)",
+    """CREATE TABLE IF NOT EXISTS student_notes (
+      id         BIGSERIAL PRIMARY KEY,
+      student_id BIGINT NOT NULL REFERENCES students(id),
+      teacher_id BIGINT NOT NULL REFERENCES users(id),
+      body       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )""",
 ]
 

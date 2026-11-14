@@ -95,8 +95,10 @@ def adult_names(db: Session) -> list[str]:
 # ---- 대화 만들기 · 닫기 (C 추출은 닫을 때)
 
 def create_conversation(db: Session, teacher_id: int, parent_id: int, student_name: str):
+    """반 명단에 같은 이름이 있으면 student_id 를 이어 둔다 (없으면 NULL — 메모 칸이 안 보일 뿐)."""
     row = db.execute(
-        text("INSERT INTO conversations (teacher_id, parent_id, student_name) VALUES (:t, :p, :s) RETURNING *"),
+        text("INSERT INTO conversations (teacher_id, parent_id, student_name, student_id) VALUES (:t, :p, :s, "
+             "(SELECT id FROM students WHERE teacher_id = :t AND name = :s)) RETURNING *"),
         {"t": teacher_id, "p": parent_id, "s": student_name},
     ).mappings().first()
     db.commit()
@@ -294,6 +296,60 @@ def list_reported(db: Session):
 
 def user_ids_with_role(db: Session, role: str) -> list[int]:
     return [r[0] for r in db.execute(text("SELECT id FROM users WHERE role = :r ORDER BY id"), {"r": role}).all()]
+
+
+# ---- 학생 · 학생 메모
+
+def list_students(db: Session, teacher_id: int):
+    return db.execute(text("SELECT * FROM students WHERE teacher_id = :t ORDER BY name"), {"t": teacher_id}).mappings().all()
+
+
+def student_names(db: Session, teacher_id: int) -> list[str]:
+    """가명처리 학생 명단 = 그 교사의 반."""
+    return [s["name"] for s in list_students(db, teacher_id)]
+
+
+def get_student(db: Session, student_id: int):
+    return db.execute(text("SELECT * FROM students WHERE id = :i"), {"i": student_id}).mappings().first()
+
+
+def list_notes(db: Session, student_id: int, teacher_id: int):
+    """최근 것 먼저."""
+    return db.execute(
+        text("SELECT * FROM student_notes WHERE student_id = :s AND teacher_id = :t ORDER BY created_at DESC, id DESC"),
+        {"s": student_id, "t": teacher_id},
+    ).mappings().all()
+
+
+def note_counts(db: Session, teacher_id: int) -> dict[int, int]:
+    rows = db.execute(text("SELECT student_id, count(*) FROM student_notes WHERE teacher_id = :t GROUP BY student_id"),
+                      {"t": teacher_id}).all()
+    return {r[0]: r[1] for r in rows}
+
+
+def create_note(db: Session, student_id: int, teacher_id: int, body: str):
+    row = db.execute(
+        text("INSERT INTO student_notes (student_id, teacher_id, body) VALUES (:s, :t, :b) RETURNING *"),
+        {"s": student_id, "t": teacher_id, "b": body},
+    ).mappings().first()
+    db.commit()
+    return row
+
+
+def get_note(db: Session, note_id: int):
+    return db.execute(text("SELECT * FROM student_notes WHERE id = :i"), {"i": note_id}).mappings().first()
+
+
+def update_note(db: Session, note_id: int, body: str):
+    row = db.execute(text("UPDATE student_notes SET body = :b, updated_at = now() WHERE id = :i RETURNING *"),
+                     {"b": body, "i": note_id}).mappings().first()
+    db.commit()
+    return row
+
+
+def delete_note(db: Session, note_id: int) -> None:
+    db.execute(text("DELETE FROM student_notes WHERE id = :i"), {"i": note_id})
+    db.commit()
 
 
 # ---- 시험용 초기화 (/dev/reset)
