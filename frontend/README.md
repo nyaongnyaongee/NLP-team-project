@@ -137,25 +137,18 @@ frontend/
 - **Node.js 20.19 이상**(또는 22 이상) 설치 — https://nodejs.org (Vite 8 요구 버전)
 - **백엔드 실행 환경**: PostgreSQL, Python, `.env` 설정은 저장소 루트 `README.md`의 「실행」 절을 따릅니다.
 
-### 2. 백엔드 켜기
+### 2. 켜기 (한 줄)
 
 ```powershell
 cd backend
-py dev\dev.py
+py dev\dev.py          # Mac: python3 dev/dev.py
 ```
 
-DB·테이블·테스트 계정을 만들고 백엔드(8000)와 확인 화면(5173)을 켭니다. 끄기는 `Ctrl+C`.
+DB·테이블·테스트 계정을 만들고 백엔드(8000), 확인 화면(5173), **React 화면(5174)** 을 함께 켠 뒤 브라우저로 **http://localhost:5174/** 를 엽니다. 끄기는 `Ctrl+C` (모두 같이 꺼짐).
+`node_modules` 가 없거나 `package-lock.json` 이 바뀌었으면 `npm install` 도 알아서 합니다. (5173은 시험 화면입니다. 우리 앱이 아닙니다.)
 **정제(Claude API 호출)는 기본이 꺼져 있습니다.** 켜려면 `py dev\dev.py --refine` (건당 약 0.006달러).
 
-### 3. 프런트 켜기 (새 터미널)
-
-```powershell
-cd frontend
-npm install          # 처음 한 번 (또는 package.json 이 바뀌었을 때)
-npm run dev
-```
-
-터미널에 나온 주소로 접속합니다. 기본은 **http://localhost:5174/** 이고, 5174를 다른 프로그램이 쓰고 있으면 5175 등으로 자동 변경되니 터미널의 주소를 따르세요. (5173은 백엔드가 띄우는 시험 화면입니다. 우리 앱이 아닙니다.)
+프런트만 따로 켜고 싶으면 (예: 백엔드는 이미 켜 둔 경우): `py dev\dev.py --no-react` 로 백엔드를 켜고, `frontend` 에서 `npm install` → `npm run dev`.
 
 브라우저는 `/api`로만 요청하고 개발 서버가 8000으로 전달하므로(`vite.config.ts`) 서버의 CORS 설정은 건드릴 필요가 없습니다.
 
