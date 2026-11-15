@@ -782,3 +782,10 @@ input.notice-input.student-search {
     min-height: 66px;
   }
 }
+
+/* 대화방: 「‹ 대화 목록 · 대화 종료」 줄과 이름 줄 사이 가로선 */
+.chat-screen .chat-head {
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 0.5px solid var(--ios-hairline);
+}
