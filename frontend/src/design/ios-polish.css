@@ -1,0 +1,829 @@
+/*
+ * iOS 기본 앱 느낌 다듬기 — 배치(큰 틀)는 그대로 두고 색 · 모양 · 그림자만 바꾼다.
+ * 이 파일 하나만 마지막에 불러온다(main.tsx). 빼면 예전 모양으로 돌아간다.
+ *  - 색: iOS 시스템 색 계열 (파랑은 흰 글씨 대비 4.5:1 이 되게 #0071F0, 빨강 #FF3B30)
+ *  - 배경: 그룹 배경(#F2F2F7) 위에 흰 카드, 테두리 대신 얇은 그림자
+ *  - 위 · 아래 바: 반투명 흰색 + 흐림, 머리카락 선(0.5px)
+ *  - 칩 → 세그먼트 컨트롤, 말풍선 → 메시지 앱 모양, 달력 선택 → 동그라미
+ */
+:root {
+  --primary: #0071f0;
+  --primary-hover: #0064d6;
+  --primary-strong: #0071f0;
+  --navy: #1c1c1e;
+  --light-blue: #e8f1fe;
+  --background: #f2f2f7;
+  --white: #ffffff;
+  --secondary: #6c6c70;
+  --border: rgba(60, 60, 67, 0.16);
+  --danger: #e5352b;
+  --ios-red: #ff3b30;
+  --ios-fill: rgba(118, 118, 128, 0.12);
+  --ios-hairline: rgba(60, 60, 67, 0.22);
+  --ios-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 10px rgba(0, 0, 0, 0.04);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --round: -apple-system, BlinkMacSystemFont, 'SF Pro Display', Pretendard, 'Apple SD Gothic Neo', sans-serif;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.2px;
+}
+
+/* ── 위 바: 반투명 + 흐림 + 머리카락 선 */
+.top {
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--ios-hairline);
+}
+.school-name {
+  font-weight: 650;
+  border-left-color: var(--ios-hairline);
+}
+.top:after {
+  color: var(--secondary);
+}
+/* 로그아웃: 상자 없이 파란 글자 (iOS 막대 단추) */
+.notification-toggle,
+.notification-toggle.off {
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-weight: 500;
+  font-size: 15px;
+  box-shadow: none;
+}
+
+/* ── 큰 제목 */
+.eyebrow {
+  color: var(--secondary);
+  letter-spacing: 0.4px;
+  font-weight: 600;
+  font-size: 13px;
+}
+h2 {
+  font-family: var(--round);
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+h3 {
+  letter-spacing: -0.4px;
+}
+
+/* ── 단추 */
+.primary {
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.3px;
+}
+.primary:disabled {
+  background: #d1d1d6;
+  color: #6c6c70;
+}
+.outline,
+.resume,
+.end {
+  border: 0;
+  background: var(--ios-fill);
+  color: var(--primary);
+  font-weight: 600;
+}
+.outline:hover,
+.resume:hover,
+.end:hover {
+  background: rgba(118, 118, 128, 0.18);
+}
+.back {
+  font-weight: 500;
+  font-size: 17px;
+}
+/* 「＋ 새 대화」 「＋ 일정 추가」: 옅게 물든 알약 */
+.manual-add,
+.notice-create {
+  border: 0;
+  border-radius: 999px;
+  background: var(--light-blue);
+  color: var(--primary);
+  font-weight: 600;
+  padding: 8px 14px;
+  min-height: 36px;
+}
+.item-edit,
+.memo-open {
+  border: 0;
+  border-radius: 999px;
+  background: var(--ios-fill);
+  color: var(--primary);
+  font-weight: 600;
+}
+.item-edit.danger {
+  color: var(--danger);
+}
+.delete-item {
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--danger);
+  font-weight: 600;
+  box-shadow: var(--ios-shadow);
+}
+.add-task {
+  border-radius: 999px;
+  background: var(--primary);
+  font-weight: 600;
+}
+
+/* ── 입력칸 */
+textarea,
+input.notice-input,
+.manual-form input {
+  border: 0.5px solid var(--ios-hairline);
+  border-radius: 12px;
+  color: var(--navy);
+}
+textarea:focus,
+input.notice-input:focus,
+.manual-form input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 113, 240, 0.15);
+}
+
+/* ── 칩 → 세그먼트 컨트롤 */
+.chips {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--ios-fill);
+  margin-bottom: 4px;
+}
+.chips button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--navy);
+  font-weight: 500;
+  min-height: 32px;
+  padding: 6px 14px;
+}
+.chips button:hover {
+  background: transparent;
+  color: var(--navy);
+}
+.chips button.active,
+.chips button.active:hover {
+  background: #fff;
+  color: var(--navy);
+  font-weight: 600;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04);
+}
+
+/* ── 목록 카드: 테두리 대신 그림자 */
+.row,
+.todo,
+.agenda,
+.history-card,
+.report-card,
+.calendar-card,
+.candidate-box,
+.recipient {
+  border: 0;
+  box-shadow: var(--ios-shadow);
+}
+.row,
+.todo,
+.agenda {
+  border-radius: 16px;
+}
+.row:hover {
+  border-color: transparent;
+  background: #fafafa;
+}
+.row:active {
+  background: #f0f0f3;
+}
+.row-title b {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+.row-title small {
+  font-size: 13px;
+}
+.row-summary {
+  font-weight: 500;
+  color: var(--navy);
+}
+.row-main + .muted {
+  color: #c7c7cc;
+  font-size: 20px;
+}
+.avatar {
+  color: var(--primary); /* 모양 · 배경은 원래 것 그대로 */
+}
+/* 태그: 작은 알약 */
+.tag,
+.due {
+  border-radius: 999px;
+  background: var(--ios-fill);
+  color: var(--secondary);
+  font-weight: 600;
+}
+.row-name .tag {
+  background: var(--light-blue);
+  color: var(--primary);
+}
+/* 안 읽은 수: iOS 빨강 */
+.unread {
+  background: var(--ios-red);
+}
+/* 밀어서 나오는 단추: iOS 회색 · 빨강 */
+.swipe-action {
+  background: #8e8e93;
+  border-radius: 16px;
+  font-weight: 600;
+}
+.swipe-action.danger {
+  background: var(--ios-red);
+}
+.swipe-front .row {
+  box-shadow: var(--ios-shadow);
+}
+
+/* ── 대화방: 메시지 앱 말풍선 */
+.chat-person {
+  border-bottom: 0.5px solid var(--ios-hairline);
+}
+.chat-person b {
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
+.chat-name {
+  color: var(--secondary);
+  font-weight: 500;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.chat-name span {
+  color: #8e8e93;
+}
+.chat-message {
+  max-width: 82%;
+  margin: 14px 0;
+}
+.chat-bubble {
+  border: 0;
+  background: #e9e9eb;
+  color: #1c1c1e;
+  border-radius: 20px 20px 20px 6px;
+  padding: 10px 14px;
+  font-size: 16px;
+  line-height: 1.55;
+  width: fit-content;
+  max-width: 100%;
+}
+.mine .chat-bubble {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 20px 20px 6px 20px;
+  margin-left: auto;
+}
+.refined-note {
+  color: #8e8e93;
+}
+/* 입력 영역: 반투명 바 */
+.chat-compose {
+  background: rgba(242, 242, 247, 0.9);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 0.5px solid var(--ios-hairline);
+}
+.chat-compose .reply > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--secondary);
+}
+.chat-compose textarea {
+  border-radius: 18px;
+  background: #fff;
+  height: 84px;
+  min-height: 60px;
+}
+.closed-note {
+  background: var(--ios-fill);
+  border-radius: 12px;
+}
+
+/* ── 달력: 선택한 날은 파란 동그라미 */
+.month-head button {
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-size: 26px;
+}
+.month-head b {
+  font-weight: 650;
+  letter-spacing: -0.4px;
+}
+.weekday {
+  color: #8e8e93;
+  font-weight: 500;
+}
+.cal-day {
+  width: 38px;
+  height: 38px;
+  justify-self: center;
+  border-radius: 50%;
+  font-weight: 450;
+}
+.cal-day:hover {
+  background: var(--ios-fill);
+}
+.cal-day.selected {
+  background: var(--primary);
+  font-weight: 600;
+}
+.cal-day i {
+  background: #8e8e93;
+}
+.event-time {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ── 아래 탭 막대: 반투명 + 흐림, 고른 탭은 파란 아이콘 · 글자만 (배경 칠 없음) */
+.bottom {
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 0.5px solid var(--ios-hairline);
+}
+.bottom button {
+  color: #7c7c80;
+  font-weight: 500;
+  font-size: 11px;
+}
+.bottom button.active {
+  background: none;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ── 알림 · 빈 화면 */
+.alert {
+  border: 0;
+  border-radius: 12px;
+}
+.empty {
+  color: #8e8e93;
+  border: 0;
+  background: none;
+}
+.badge {
+  background: var(--ios-red);
+}
+
+/* 밀지 않은 줄에서는 뒤의 단추를 숨긴다 (둥근 모서리 틈으로 비치지 않게) */
+.swipe:not(.active) .swipe-actions {
+  visibility: hidden;
+}
+
+/* 학생 메모: 이름 옆 작은 알약 + 아래 칸 */
+.chat-person {
+  align-items: center;
+}
+.chat-person > div {
+  flex: 1;
+  min-width: 0;
+}
+.memo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 4px 11px;
+  background: var(--ios-fill);
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 600;
+}
+.memo-toggle.on {
+  background: var(--light-blue);
+  color: var(--primary);
+}
+.memo-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.memo-panel {
+  margin: 10px 0 2px;
+}
+.memo-panel textarea {
+  margin: 0;
+  height: 96px;
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 10px 12px;
+}
+.memo-panel .info {
+  margin: 4px 2px 8px;
+  font-size: 11px;
+}
+.memo-state {
+  color: var(--primary);
+}
+
+/* 학생 탭 */
+input.notice-input.student-search {
+  margin: 14px 0 4px;
+  min-height: 40px !important;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 0 !important;
+  background: var(--ios-fill);
+  font-size: 16px;
+}
+.student-line {
+  align-items: center;
+  padding: 13px 14px;
+  margin: 8px 0;
+}
+.student-line .row-last {
+  margin-top: 2px;
+}
+
+/* 답장 막대: 「답장」 옆 작은 「AI 초안」 알약, 메모는 한 줄 칸 + 「만들기」 */
+.reply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+}
+.reply-head .info {
+  margin: 0;
+}
+.draft-toggle {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 11px;
+  min-height: 30px;
+  background: var(--light-blue);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.draft-toggle.on {
+  background: var(--primary);
+  color: #fff;
+}
+.draft-memo {
+  margin: 6px 0 2px;
+}
+.draft-memo-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  background: #fff;
+  border: 0.5px solid var(--ios-hairline);
+  border-radius: 18px;
+  padding: 4px 4px 4px 12px;
+}
+.draft-memo-row:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 113, 240, 0.15);
+}
+.chat-compose .draft-memo-row textarea {
+  flex: 1;
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+  padding: 6px 0;
+  height: auto;
+  min-height: 0;
+  max-height: 72px;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  field-sizing: content; /* 글이 늘면 칸도 늘어난다 (지원하는 브라우저) */
+}
+.draft-make {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  min-width: 58px;
+  min-height: 32px;
+  padding: 0 12px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.draft-make:disabled {
+  background: #d1d1d6;
+  color: #6c6c70;
+}
+.draft-status {
+  margin: 5px 4px 0;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.chat-compose .draft-checks {
+  margin: 8px 0 4px;
+  padding: 9px 12px;
+  border-width: 1px;
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 110px;
+  overflow-y: auto;
+}
+.chat-compose .notice-draft-restore {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+.chat-compose textarea:not(#draft-memo) {
+  height: 72px;
+}
+.chat-compose .reply-actions .end,
+.chat-compose .reply-actions .primary,
+.chat-compose .parent-send .primary {
+  min-height: 46px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  font-size: 16px;
+}
+
+/* ── 위 막대: iOS 앱처럼 얇게. 작은 로고 · 학교, 오른쪽 동그란 프로필 단추 (누르면 이름 · 로그아웃) */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px 10px;
+  min-height: 58px;
+}
+.top:after {
+  content: none;
+}
+.top .brand-row {
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+.logo-lockup.ieum-lockup {
+  --ieum-mark-height: 24px;
+}
+.school-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+  padding-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile {
+  position: relative;
+  flex-shrink: 0;
+}
+.profile-button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--light-blue);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+.profile-button[aria-expanded='true'] {
+  background: var(--primary);
+  color: #fff;
+}
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 210px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--ios-hairline);
+  overflow: hidden;
+}
+.profile-who {
+  padding: 13px 16px 11px;
+  border-bottom: 0.5px solid var(--ios-hairline);
+}
+.profile-who b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.profile-who small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.profile-logout {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 15px;
+  color: var(--ios-red);
+}
+.profile-logout:hover {
+  background: var(--ios-fill);
+}
+/* 영어 머리말(CONVERSATIONS 등)은 큰 제목과 겹쳐서 숨긴다 */
+.content .eyebrow {
+  display: none;
+}
+
+/* ── 넓은 화면: 앱을 둥근 폰 카드로 (폰에서는 그대로 꽉 차게) */
+@media (min-width: 520px) and (min-height: 640px) {
+  html {
+    background: radial-gradient(1200px 700px at 50% 0%, #eef3fb 0%, #dfe6f1 60%, #d6deeb 100%);
+  }
+  #root {
+    height: min(880px, calc(100svh - 48px));
+    margin: max(24px, calc((100svh - 880px) / 2)) auto 0;
+    border-radius: 36px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.08),
+      0 30px 80px rgba(20, 35, 70, 0.22);
+  }
+  .stage,
+  .phone-shell,
+  .phone {
+    height: 100%;
+  }
+}
+
+/* ── 입력 막대: 메시지 앱처럼 한 줄 (둥근 입력칸 + 동그란 보내기), 화면 맨 아래 */
+.chat-compose {
+  padding: 8px 16px 10px;
+  margin: 0 -20px;
+}
+.composer {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.composer-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  background: #fff;
+  border: 0.5px solid var(--ios-hairline);
+  border-radius: 20px;
+  padding: 3px 3px 3px 14px;
+}
+.composer-field:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 113, 240, 0.12);
+}
+.chat-compose .composer-field textarea {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  resize: none;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.send {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  display: grid;
+  place-items: center;
+}
+.send svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.send:disabled {
+  background: #c7c7cc;
+}
+.send .spinner {
+  width: 14px;
+  height: 14px;
+}
+/* AI 초안: 입력칸 왼쪽 동그란 단추 */
+.draft-toggle {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 16px;
+}
+.chat-compose .draft-panel:not(:empty) {
+  margin-bottom: 8px;
+}
+.chat-compose .draft-memo {
+  margin: 0;
+}
+/* 대화방 머리: 오른쪽 「대화 종료」 글자 단추 */
+.head-action {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  min-height: 30px;
+  background: var(--ios-fill);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+.close-choice {
+  border: 0;
+  border-radius: 16px;
+  box-shadow: var(--ios-shadow);
+  margin: 0 0 12px;
+}
+
+/* 둥근 카드 화면에서는 위 모서리가 둥글어 좌우가 좁아 보이므로 위 막대를 조금 더 높고 안쪽으로 */
+@media (min-width: 520px) and (min-height: 640px) {
+  .top {
+    padding: 16px 26px 12px;
+    min-height: 66px;
+  }
+}
+
+/* 대화방 머리 한 줄 (‹ · 아바타 · 이름 ··· 단추들), 아래 선 하나 */
+.chat-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 12px;
+  margin: -6px 0 4px;
+  border-bottom: 0.5px solid var(--ios-hairline);
+}
+.bar-back {
+  flex-shrink: 0;
+  width: 28px;
+  height: 36px;
+  margin-left: -6px;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 300;
+  padding: 0 0 4px;
+}
+.chat-bar .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.bar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}

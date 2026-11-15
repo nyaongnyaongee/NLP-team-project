@@ -44,3 +44,11 @@ export const NoticeIcon = () => (
     <path d="M8 16v5h4l-2-5M21 9v6" />
   </Icon>
 )
+
+export const StudentIcon = () => (
+  <Icon>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" />
+    <path d="M16 4.8a3.3 3.3 0 0 1 0 6.4M18.5 14.8c1.7.7 2.7 2.4 3 5.2" />
+  </Icon>
+)

@@ -9,11 +9,24 @@ export type Conversation = {
   teacher_id: number
   parent_id: number
   student_name: string
+  student_id?: number | null // 반 명단의 학생과 이어진 대화면 그 학생 번호 (학생 메모)
   status: 'open' | 'closed'
   extract?: { status: 'pending' | 'done' | 'failed'; error?: string; count?: number; at?: string } | null // 교사에게만 옴
   created_at: string
   last_message_at?: string | null // 목록에서만 옴. 마지막 메시지 시각 (없으면 null)
+  preview?: ConversationPreview // 목록에서만 옴
+  unread?: number // 목록에서만 옴. 상대가 보낸 글 중 내가 아직 안 읽은 수
   // report, reported_at 은 선언하지 않는다 (치명 2)
+}
+
+// 목록 한 줄 요약. Claude 를 새로 부르지 않고 정제 분석을 다시 쓴다.
+// last.text: 보는 사람 기준 마지막 글 (교사 = 정제문 · 통과 원문). 처리 전 · 실패한 학부모 글은 null → status 로 문구
+// summary · topic · requests: 교사 · 학부모 둘 다. summary = 첫 학부모 글의 한 줄 요약, requests = summary 가 없는 예전 글용
+export type ConversationPreview = {
+  last: { text: string | null; mine: boolean; status: MessageStatus } | null
+  summary?: string | null
+  topic?: string | null
+  requests?: string[]
 }
 
 // 대화를 시작할 수 있는 학생 (교사 = 학부모가 등록된 반 학생, 학부모 = 내 아이)
@@ -33,14 +46,16 @@ export type Message = {
   refined_text: string | null // 교사에게만
   analysis: Record<string, unknown> | null // 교사에게만, 모양 자유. 실패 시 { error: string }
   status: MessageStatus // 학부모 화면은 읽지 않는다 (중대 5)
+  refined?: boolean | null // 학부모에게만: 내 글이 다듬어져 선생님께 갔는지 (정제문은 안 옴)
   created_at: string
 }
 
 export type Task = {
   id: number
-  conversation_id: number
-  student_name: string
+  conversation_id: number | null // null = 교사가 직접 등록한 반 전체 일정
+  student_name: string | null
   kind: 'todo' | 'event'
+  shared?: boolean // 일정: 학부모 캘린더에 보임
   title: string
   due_text: string | null // 대화에 적힌 표현 그대로
   due_at: string | null // 시각이 없으면 그날 00:00 (한국 시각)
@@ -61,4 +76,16 @@ export type Notice = {
   created_at: string
   updated_at: string
   sent_at: string | null
+}
+
+// 학부모 캘린더의 일정 (선생님이 공유한 것만, 서버 schemas/todo.py ParentEventOut)
+export type ParentEvent = {
+  id: number
+  conversation_id: number | null
+  student_name: string | null // null = 반 전체
+  teacher_name: string
+  title: string
+  due_text: string | null
+  due_at: string | null
+  status: 'added' | 'done'
 }

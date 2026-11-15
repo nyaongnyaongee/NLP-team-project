@@ -19,8 +19,12 @@ def get_conversation(db: Session, conv_id: int):
 
 def list_conversations(db: Session, user_id: int):
     return db.execute(
-        text("SELECT c.*, (SELECT max(m.created_at) FROM messages m WHERE m.conversation_id = c.id) AS last_message_at "
-             "FROM conversations c WHERE c.teacher_id = :u OR c.parent_id = :u ORDER BY c.id"),
+        text("SELECT c.*, (SELECT max(m.created_at) FROM messages m WHERE m.conversation_id = c.id) AS last_message_at, "
+             "(SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id <> :u AND m.id > "
+             " COALESCE(CASE WHEN c.teacher_id = :u THEN c.teacher_read_id ELSE c.parent_read_id END, 0)) AS unread "
+             "FROM conversations c WHERE (c.teacher_id = :u AND c.teacher_deleted_at IS NULL) "
+             "OR (c.parent_id = :u AND c.parent_deleted_at IS NULL) "
+             "ORDER BY c.id"),
         {"u": user_id},
     ).mappings().all()
 
@@ -116,9 +120,10 @@ def startable_students(db: Session, user: dict):
         f"WHERE {who} = :u ORDER BY s.name"), {"u": user["id"]}).mappings().all()
 
 
-def set_conversation_status(db: Session, conv_id: int, status: str):
-    """open | closed. 닫으면 추출 상태를 pending 으로 둔다 (같은 줄에서 바꿔야 화면이 「추출 중」을 바로 본다)."""
-    extract = "CAST('{\"status\": \"pending\"}' AS JSONB)" if status == "closed" else "extract"
+def set_conversation_status(db: Session, conv_id: int, status: str, extract: bool = True):
+    """open | closed. 추출하며 닫으면 추출 상태를 pending 으로 둔다 (같은 줄에서 바꿔야 화면이 「추출 중」을 바로 본다).
+    추출 없이 닫으면 추출 상태는 그대로 둔다 (예전에 뽑은 후보 · 상태가 남음)."""
+    extract = "CAST('{\"status\": \"pending\"}' AS JSONB)" if status == "closed" and extract else "extract"
     row = db.execute(
         text(f"UPDATE conversations SET status = :st, extract = {extract} WHERE id = :i RETURNING *"),
         {"st": status, "i": conv_id},
@@ -127,12 +132,20 @@ def set_conversation_status(db: Session, conv_id: int, status: str):
     return row
 
 
-def reopen_if_closed(db: Session, conv_id: int) -> bool:
-    """닫힌 대화에 새 메시지가 오면 다시 연다. 열었으면 True."""
-    n = db.execute(text("UPDATE conversations SET status = 'open' WHERE id = :i AND status = 'closed'"),
-                   {"i": conv_id}).rowcount
+def mark_read(db: Session, conv_id: int, role: str):
+    """지금까지 온 메시지를 모두 읽음으로 (role = teacher | parent). 뒤로 가지 않게 큰 값만 남긴다."""
+    col = {"teacher": "teacher_read_id", "parent": "parent_read_id"}[role]
+    db.execute(text(f"UPDATE conversations SET {col} = GREATEST(COALESCE({col}, 0), "
+                    "COALESCE((SELECT max(id) FROM messages WHERE conversation_id = :i), 0)) WHERE id = :i"),
+               {"i": conv_id})
     db.commit()
-    return n > 0
+
+
+def hide_conversation(db: Session, conv_id: int, role: str):
+    """교사 또는 학부모 목록에서만 지운다 (role = teacher | parent). 행 · 메시지 · 할 일 · 보고서는 DB 에 그대로 남는다."""
+    col = {"teacher": "teacher_deleted_at", "parent": "parent_deleted_at"}[role]
+    db.execute(text(f"UPDATE conversations SET {col} = now() WHERE id = :i"), {"i": conv_id})
+    db.commit()
 
 
 def save_extract_result(db: Session, conv_id: int, result: dict) -> int:
@@ -162,8 +175,8 @@ def save_extract_result(db: Session, conv_id: int, result: dict) -> int:
 
 def list_tasks(db: Session, teacher_id: int, kind: str, status: str | None = None, conv_id: int | None = None):
     """교사 한 명의 할 일(todo) 또는 일정(event). 날짜 있는 것 먼저(가까운 순), 그다음 만든 순."""
-    sql = ("SELECT t.*, c.student_name FROM tasks t JOIN conversations c ON c.id = t.conversation_id "
-           "WHERE c.teacher_id = :u AND t.kind = :k")
+    sql = ("SELECT t.*, c.student_name FROM tasks t LEFT JOIN conversations c ON c.id = t.conversation_id "
+           "WHERE COALESCE(t.teacher_id, c.teacher_id) = :u AND t.kind = :k")
     params: dict = {"u": teacher_id, "k": kind}
     if status:
         sql += " AND t.status = :st"
@@ -185,13 +198,44 @@ def task_titles(db: Session, conv_id: int, statuses: tuple[str, ...]) -> list[di
 
 def get_task(db: Session, task_id: int):
     return db.execute(
-        text("SELECT t.*, c.student_name, c.teacher_id FROM tasks t JOIN conversations c ON c.id = t.conversation_id "
-             "WHERE t.id = :i"), {"i": task_id},
+        text("SELECT t.*, c.student_name, c.parent_id, COALESCE(t.teacher_id, c.teacher_id) AS owner_id "
+             "FROM tasks t LEFT JOIN conversations c ON c.id = t.conversation_id WHERE t.id = :i"), {"i": task_id},
     ).mappings().first()
 
 
+def create_event(db: Session, teacher_id: int, title: str, due_at, shared: bool) -> int:
+    """교사가 직접 등록하는 반 전체 일정 (대화 없음). 바로 「추가됨」."""
+    new_id = db.execute(
+        text("INSERT INTO tasks (teacher_id, kind, title, due_at, status, shared) "
+             "VALUES (:t, 'event', :ti, :d, 'added', :s) RETURNING id"),
+        {"t": teacher_id, "ti": title, "d": due_at, "s": shared},
+    ).scalar()
+    db.commit()
+    return new_id
+
+
+def parent_events(db: Session, parent_id: int):
+    """학부모 캘린더: 공유한 일정 중 추가 · 완료한 것.
+    대화에서 나온 일정은 그 대화의 학부모만, 반 전체 일정은 공지와 같은 기준(반 학생의 학부모 + 그 교사와 대화가 있는 학부모)."""
+    return db.execute(text(
+        "SELECT t.id, t.conversation_id, c.student_name, t.title, t.due_text, t.due_at, t.status, t.created_at, "
+        "u.name AS teacher_name FROM tasks t LEFT JOIN conversations c ON c.id = t.conversation_id "
+        "JOIN users u ON u.id = COALESCE(t.teacher_id, c.teacher_id) "
+        "WHERE t.kind = 'event' AND t.status IN ('added', 'done') AND t.shared AND ("
+        " c.parent_id = :p OR (t.conversation_id IS NULL AND t.teacher_id IN ("
+        "  SELECT teacher_id FROM students WHERE parent_id = :p UNION SELECT teacher_id FROM conversations WHERE parent_id = :p))) "
+        "ORDER BY t.due_at NULLS LAST, t.id"), {"p": parent_id}).mappings().all()
+
+
+def event_audience(db: Session, task) -> list[int]:
+    """이 일정이 보이는 (보일 수 있는) 학부모 — 바뀌었을 때 알림을 보낼 곳."""
+    if task["conversation_id"] is not None:
+        return [task["parent_id"]]
+    return notice_recipients(db, task["owner_id"])
+
+
 def update_task(db: Session, task_id: int, fields: dict) -> None:
-    """fields: title · due_text · due_at · status 중 바꿀 것만."""
+    """fields: title · due_text · due_at · status · shared 중 바꿀 것만."""
     if not fields:
         return
     sets = ", ".join(f"{k} = :{k}" for k in fields)
@@ -354,7 +398,8 @@ def save_memo(db: Session, student_id: int, teacher_id: int, body: str):
 def dev_reset(db: Session) -> list[int]:
     """메시지 · 할 일/일정 · 공지를 모두 지우고 대화를 처음 상태(열림, 추출 없음)로. 계정 · 대화 자체는 둔다. 대화 id 목록을 돌려준다."""
     db.execute(text("TRUNCATE messages, tasks, notices RESTART IDENTITY"))
-    db.execute(text("UPDATE conversations SET status = 'open', extract = NULL, report = NULL, reported_at = NULL"))
+    db.execute(text("UPDATE conversations SET status = 'open', extract = NULL, report = NULL, reported_at = NULL, "
+                    "teacher_deleted_at = NULL, parent_deleted_at = NULL, teacher_read_id = NULL, parent_read_id = NULL"))
     ids = [r[0] for r in db.execute(text("SELECT id FROM conversations ORDER BY id")).all()]
     db.commit()
     return ids

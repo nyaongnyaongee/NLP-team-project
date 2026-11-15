@@ -92,6 +92,9 @@
         }
       ]
     },
+    "summary": {
+      "type": "string"
+    },
     "refined": {
       "type": "string"
     }
@@ -104,6 +107,7 @@
     "requests",
     "threats",
     "deadline",
+    "summary",
     "refined"
   ],
   "additionalProperties": false

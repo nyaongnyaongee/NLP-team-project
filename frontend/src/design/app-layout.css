@@ -166,3 +166,29 @@ ul.plain-list {
 .start-conversation .row:disabled {
   opacity: 0.6;
 }
+
+/* 대화방: 메시지가 적어도 입력창은 화면 아래에, 많으면 스크롤해도 입력창이 아래에 붙어 있다 */
+.chat-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.chat-screen .chat-log {
+  flex: 1;
+}
+.content:has(.chat-screen) {
+  padding-bottom: 0; /* 입력창이 바닥에 딱 붙게 (아래 여백은 입력창 안에서) */
+}
+.chat-compose {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -20px;
+  padding: 0 20px 16px;
+  background: var(--background);
+  border-top: 1px solid var(--border);
+  z-index: 2;
+}
+.chat-compose .reply {
+  border-top: 0;
+  margin-top: 0;
+}

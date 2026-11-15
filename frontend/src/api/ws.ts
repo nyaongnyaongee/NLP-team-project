@@ -5,6 +5,7 @@
 export type ServerEvent =
   | { type: 'changed'; conversationId: number } // 대화가 바뀜
   | { type: 'notice'; noticeId: number | null } // 공지 게시 (시험용 초기화에서는 번호가 없다)
+  | { type: 'events' } // 학부모: 선생님이 공유한 일정이 바뀜
 
 export type SocketHandlers = {
   onReady: () => void
@@ -18,6 +19,7 @@ function parseEvent(data: unknown): ServerEvent | null {
   if (msg.type === 'changed' && typeof msg.conversation_id === 'number') {
     return { type: 'changed', conversationId: msg.conversation_id }
   }
+  if (msg.type === 'events') return { type: 'events' }
   if (msg.type === 'notice') {
     return { type: 'notice', noticeId: typeof msg.notice_id === 'number' ? msg.notice_id : null }
   }

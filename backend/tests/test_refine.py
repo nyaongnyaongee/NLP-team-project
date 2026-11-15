@@ -68,6 +68,23 @@ def test_요청_문장도_복원된다():
     assert result["analysis"]["requests"][0]["text"] == "서윤의 물통 일을 설명해 달라"
 
 
+def test_요약도_복원되고_없거나_비면_뺀다():
+    def builder(m):
+        fake_name = m.split("이 ")[0]
+        return reply(good(m, summary=f" {fake_name} 물통 새로 사 달라는 요청 "))
+
+    result, _ = run(builder)
+    assert result["analysis"]["summary"] == "서윤 물통 새로 사 달라는 요청"
+    for empty in ("", None):
+        assert "summary" not in run(lambda m: reply(good(m, summary=empty)))[0]["analysis"]
+    assert "summary" not in run(lambda m: reply(good(m)))[0]["analysis"]
+
+
+def test_요약에_지어낸_이름이_있으면_실패():
+    result, _ = run(lambda m: reply(good(m, summary="민재 물통 문의")))
+    assert result["status"] == "failed" and "민재" in result["error"]
+
+
 def test_거절되면_실패():
     result, _ = run(lambda m: reply(text="", stop="refusal", category="general_harms"))
     assert result["status"] == "failed" and "거절" in result["error"]

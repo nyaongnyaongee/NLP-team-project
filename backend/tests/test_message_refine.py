@@ -309,3 +309,18 @@ def test_정제가_실패하면_정제_여부는_비어_있다(client, auth, ids
     send(client, auth, "parent1", ids["conv_parent1"], RAW)
     with engine.connect() as c:
         assert c.execute(text("SELECT status, needs_refinement FROM messages")).one() == ("failed", None)
+
+
+def test_학부모는_자기_글이_정제됐는지만_안다(client, auth, ids, engine):
+    conv = ids["conv_parent1"]
+    with engine.begin() as c:
+        for raw, refined, needs, st in (("거친 글", "다듬은 글", True, "done"), ("고운 글", None, False, "done"),
+                                        ("처리 전", None, None, "pending")):
+            c.execute(text("INSERT INTO messages (conversation_id, sender_id, raw_text, refined_text, needs_refinement, "
+                           "status) VALUES (:c, :s, :r, :f, :n, :st)"),
+                      {"c": conv, "s": ids["parent1"], "r": raw, "f": refined, "n": needs, "st": st})
+    mine = client.get(f"/conversations/{conv}/messages", headers=auth("parent1")).json()[-3:]
+    assert [(m["raw_text"], m["refined"], m["refined_text"]) for m in mine] == [
+        ("거친 글", True, None), ("고운 글", False, None), ("처리 전", False, None)]
+    teacher = client.get(f"/conversations/{conv}/messages", headers=auth("teacher1")).json()
+    assert all(m["refined"] is None for m in teacher)  # 교사에게는 여전히 안 줌

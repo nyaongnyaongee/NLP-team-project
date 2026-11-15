@@ -18,7 +18,7 @@ def clean(engine, ids):
         c.execute(text("TRUNCATE messages, tasks RESTART IDENTITY"))
         c.execute(text("DELETE FROM conversations WHERE id NOT IN (:a, :b)"),
                   {"a": ids["conv_parent1"], "b": ids["conv_parent2"]})
-        c.execute(text("UPDATE conversations SET status = 'open', extract = NULL"))
+        c.execute(text("UPDATE conversations SET status = 'open', extract = NULL, teacher_deleted_at = NULL, parent_deleted_at = NULL"))
 
 
 @pytest.fixture
@@ -54,6 +54,22 @@ DONE = {"status": "done", "error": None, "tasks": [
 
 def close(client, auth, conv, who="teacher1"):
     return client.post(f"/conversations/{conv}/close", headers=auth(who))
+
+
+def test_뽑지_않고_닫을_수_있고_나중에_뽑는다(client, auth, ids, engine, extractor):
+    conv = ids["conv_parent1"]
+    put(engine, conv, ids["parent1"], "done", "상담하고 싶어요", "상담하고 싶어요")
+    calls = extractor(DONE)
+
+    r = client.post(f"/conversations/{conv}/close", headers=auth("teacher1"), json={"extract": False})
+    assert r.status_code == 202 and r.json()["status"] == "closed" and r.json()["extract"] is None
+    assert calls == []  # Claude 안 부름
+    assert client.get(f"/conversations/{conv}", headers=auth("teacher1")).json()["extract"] is None
+
+    assert client.post(f"/conversations/{conv}/extract", headers=auth("teacher1")).status_code == 202
+    assert len(calls) == 1
+    c = client.get(f"/conversations/{conv}", headers=auth("teacher1")).json()
+    assert c["extract"]["status"] == "done" and c["extract"]["count"] == 2
 
 
 def test_닫으면_추출해서_후보로_저장된다(client, auth, ids, engine, extractor):
@@ -113,7 +129,7 @@ def test_스위치가_꺼져_있으면_Claude_를_안_부르고_실패(client, a
     assert c["extract"]["status"] == "failed" and "꺼져" in c["extract"]["error"]
 
 
-def test_새_메시지가_오면_다시_열리고_다시_닫으면_후보만_바뀐다(client, auth, ids, engine, extractor):
+def test_종료된_대화에는_못_보내고_다시_뽑으면_후보만_바뀐다(client, auth, ids, engine, extractor):
     conv = ids["conv_parent1"]
     put(engine, conv, ids["teacher1"], "skip", "안녕하세요")
     extractor(DONE)
@@ -122,12 +138,14 @@ def test_새_메시지가_오면_다시_열리고_다시_닫으면_후보만_바
     r = client.patch(f"/todos/{todo['id']}", json={"status": "added"}, headers=auth("teacher1"))
     assert r.status_code == 200 and r.json()["status"] == "added"
 
-    client.post(f"/conversations/{conv}/messages", json={"text": "하나 더요"}, headers=auth("parent1"))
-    assert client.get(f"/conversations/{conv}", headers=auth("teacher1")).json()["status"] == "open"
+    for who in ("parent1", "teacher1"):
+        r = client.post(f"/conversations/{conv}/messages", json={"text": "하나 더요"}, headers=auth(who))
+        assert r.status_code == 409
+    assert client.get(f"/conversations/{conv}", headers=auth("teacher1")).json()["status"] == "closed"
 
     calls = extractor({"status": "done", "error": None, "tasks": [
         {"kind": "event", "title": "새 일정", "due_text": None, "due_at": None}]})
-    close(client, auth, conv)
+    client.post(f"/conversations/{conv}/extract", headers=auth("teacher1"))
     assert calls[-1]["existing"] == [{"kind": "todo", "title": "체육 선생님께 전달하기"}]
     assert [t["title"] for t in client.get("/todos", headers=auth("teacher1")).json()] == ["체육 선생님께 전달하기"]
     assert [t["title"] for t in client.get("/events", headers=auth("teacher1")).json()] == ["새 일정"]  # 옛 후보 「학부모 상담」은 바뀜
@@ -180,3 +198,26 @@ def test_시험용_초기화는_DEV_TOOLS_일_때만_되고_내용만_지운다(
     assert client.get("/todos", headers=h).json() == [] and client.get("/events", headers=h).json() == []
     c = client.get(f"/conversations/{ids['conv_parent1']}", headers=h).json()
     assert c["status"] == "open" and c["extract"] is None
+
+
+def test_종료된_대화는_교사_목록에서만_지우고_DB_에는_남는다(client, auth, ids, engine):
+    conv, h = ids["conv_parent1"], auth("teacher1")
+    put(engine, conv, ids["parent1"], "done", "감사합니다", "감사합니다")
+    assert client.delete(f"/conversations/{conv}", headers=h).status_code == 409  # 열린 대화는 못 지움
+    client.post(f"/conversations/{conv}/close", headers=h, json={"extract": False})
+    assert client.delete(f"/conversations/{conv}", headers=h).status_code == 204
+
+    assert conv not in [c["id"] for c in client.get("/conversations", headers=h).json()]
+    mine = client.get("/conversations", headers=auth("parent1")).json()
+    assert conv in [c["id"] for c in mine] and "teacher_deleted_at" not in mine[0]
+    with engine.begin() as c:
+        row = c.execute(text("SELECT teacher_deleted_at, (SELECT count(*) FROM messages WHERE conversation_id = :i) "
+                             "FROM conversations WHERE id = :i"), {"i": conv}).first()
+    assert row[0] is not None and row[1] == 1  # DB 에는 대화 · 메시지가 남음
+
+    # 학부모도 자기 목록에서만 지운다
+    assert client.delete(f"/conversations/{conv}", headers=auth("parent2")).status_code == 404
+    assert client.delete(f"/conversations/{conv}", headers=auth("parent1")).status_code == 204
+    assert conv not in [c["id"] for c in client.get("/conversations", headers=auth("parent1")).json()]
+    with engine.begin() as c:
+        assert c.execute(text("SELECT parent_deleted_at FROM conversations WHERE id = :i"), {"i": conv}).scalar()

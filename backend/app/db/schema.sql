@@ -29,6 +29,10 @@ CREATE TABLE conversations (
   status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),  -- closed → C 추출
   report       JSONB,                       -- 신고 보고서. NULL 이면 신고 안 함
   reported_at  TIMESTAMPTZ,                 -- 민원대응팀 화면 = 이 값이 있는 대화
+  teacher_deleted_at TIMESTAMPTZ,           -- 교사가 목록에서 지운 시각 (종료된 대화만). 행 · 메시지는 DB 에 남김. 종료된 대화에는 글을 못 보내므로 다시 나타나지 않음
+  parent_deleted_at  TIMESTAMPTZ,
+  teacher_read_id    BIGINT,                -- 담임이 마지막으로 읽은 메시지 번호 (안 읽은 수 = 상대 글 중 이보다 큰 것). NULL = 안 읽음
+  parent_read_id     BIGINT,                -- 학부모 쪽, 위와 같음           -- 학부모가 목록에서 지운 시각. 위와 같음 (교사 목록 · 보고서에는 그대로)
   extract      JSONB,                       -- 할 일 · 일정 추출(C) 상태: {"status": "pending|done|failed", "error", "count", "at"}. NULL = 닫은 적 없음
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -51,8 +55,11 @@ CREATE TABLE messages (
 -- 할 일 · 일정 (C)
 CREATE TABLE tasks (
   id              BIGSERIAL PRIMARY KEY,
-  conversation_id BIGINT NOT NULL REFERENCES conversations(id),
+  conversation_id BIGINT REFERENCES conversations(id),  -- NULL = 교사가 직접 등록한 반 전체 일정
+  teacher_id      BIGINT REFERENCES users(id),           -- 직접 등록한 일정의 담임 (대화에서 뽑은 것은 NULL → 대화의 담임)
   kind            TEXT NOT NULL CHECK (kind IN ('todo', 'event')),
+  shared          BOOLEAN NOT NULL DEFAULT true,         -- 일정을 학부모 캘린더에 보일지 (추가 · 완료한 것만 보임).
+                                                         -- 대화의 일정 → 그 학부모, 반 전체 일정 → 공지 받는 학부모 전원
   title           TEXT NOT NULL,
   due_text        TEXT,                     -- 대화에 적힌 표현 그대로 (예: '이번 주 금요일까지')
   due_at          TIMESTAMPTZ,              -- 그 표현을 메시지 보낸 날 기준으로 바꾼 날짜 (Claude 가 계산, 코드가 범위 점검).

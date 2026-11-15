@@ -27,3 +27,4 @@ class MessageOut(BaseModel):
     analysis: dict | None = None  # 교사에게만. 주제 · 요청 · 위협 …, 실패하면 {"error": 사유}. 인용문(quotes)은 뺀다
     status: str
     created_at: datetime
+    refined: bool | None = None  # 학부모에게만: 자기 글이 정제돼 교사에게 다듬어진 글로 갔으면 true (정제문은 안 줌)

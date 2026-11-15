@@ -149,7 +149,7 @@ export default function TaskItem({
           <span className="todo-body">
             <b>{task.title}</b>
             <small>
-              {task.student_name} · {task.status === 'done' ? '완료' : '미완료'}
+              {task.student_name ?? '반 전체'} · {task.status === 'done' ? '완료' : '미완료'}
             </small>
             <span className="due">
               {formatDate(task.due_at)}
@@ -172,10 +172,21 @@ export default function TaskItem({
         <span className="event-time">{hasDue ? formatTimeOfDay(task.due_at) : NO_DUE}</span>
         <div>
           <b>{task.title}</b>
-          <small>{task.student_name}</small>
+          <small>
+            {task.student_name ?? '반 전체'} · {task.shared ? '학부모와 공유' : '나만 보기'}
+          </small>
           {errorLine}
         </div>
         <span className="task-actions">
+          <button
+            type="button"
+            className="item-edit"
+            onClick={() => void patch({ shared: !task.shared })}
+            disabled={busy}
+            aria-label={task.shared ? `${task.title} 공유 끄기` : `${task.title} 학부모와 공유`}
+          >
+            {task.shared ? '공유 끄기' : '공유'}
+          </button>
           {edit}
           {del}
         </span>

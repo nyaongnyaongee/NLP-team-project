@@ -1,16 +1,18 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from '../../components/AppShell'
 import BottomNav, { type NavItem } from '../../components/BottomNav'
-import { CalendarIcon, ChatIcon, NoticeIcon, TodoIcon } from '../../components/icons'
+import { CalendarIcon, ChatIcon, NoticeIcon, StudentIcon, TodoIcon } from '../../components/icons'
 import TeacherNotices from '../notices/TeacherNotices'
 import CalendarTab from '../tasks/CalendarTab'
 import TodosTab from '../tasks/TodosTab'
 import ConversationsTab from './ConversationsTab'
+import StudentsTab from './StudentsTab'
 
 const NAV: NavItem[] = [
   { to: '/teacher', label: '대화 목록', icon: <ChatIcon />, end: true },
   { to: '/teacher/todos', label: '할 일', icon: <TodoIcon /> },
   { to: '/teacher/calendar', label: '캘린더', icon: <CalendarIcon /> },
+  { to: '/teacher/students', label: '학생', icon: <StudentIcon /> },
   { to: '/teacher/notices', label: '공지사항', icon: <NoticeIcon /> },
 ]
 
@@ -22,6 +24,7 @@ export default function TeacherHome() {
         <Route index element={<ConversationsTab />} />
         <Route path="todos" element={<TodosTab />} />
         <Route path="calendar" element={<CalendarTab />} />
+        <Route path="students/*" element={<StudentsTab />} />
         <Route path="notices/*" element={<TeacherNotices />} />
         <Route path="*" element={<Navigate to="/teacher" replace />} />
       </Routes>

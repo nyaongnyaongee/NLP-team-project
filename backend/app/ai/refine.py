@@ -91,8 +91,11 @@ def _validate(parsed: dict, masked: str, masker: PiiMasker, mp: Mapping) -> list
     if deadline is not None and deadline not in masked:
         problems.append("deadline 이 원문에 그대로 없음")
 
-    # LLM 이 지어낸 이름
+    # LLM 이 지어낸 이름 (summary 는 대화 목록에 보이는 한 줄 요약. 없거나 문자열이 아니면 _unmask_analysis 가 뺀다)
+    summary = parsed.get("summary")
     texts = [refined] + [r.get("text", "") for r in parsed.get("requests") or []]
+    if isinstance(summary, str):
+        texts.append(summary)
     for t in texts:
         problems += masker.check_response(t, mp, masked)
     return problems
@@ -106,6 +109,9 @@ def _unmask_analysis(parsed: dict, mp: Mapping) -> tuple[str, dict]:
     analysis["requests"] = [{**r, "text": un(r.get("text", ""), mp)} for r in analysis.get("requests") or []]
     if analysis.get("deadline") is not None:
         analysis["deadline"] = un(analysis["deadline"], mp)
+    summary = analysis.pop("summary", None)
+    if isinstance(summary, str) and summary.strip():
+        analysis["summary"] = un(summary.strip(), mp)
     return refined, analysis
 
 

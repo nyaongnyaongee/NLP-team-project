@@ -13,5 +13,7 @@ export function useTaskList(kind: Task['kind']) {
   const replace = useCallback((t: Task) => setData((prev) => prev.map((p) => (p.id === t.id ? t : p))), [setData])
   const remove = useCallback((id: number) => setData((prev) => prev.filter((p) => p.id !== id)), [setData])
 
-  return { tasks: data, loading: !loaded && error === null, error, replace, remove }
+  const add = useCallback((t: Task) => setData((prev) => [...prev, t]), [setData])
+
+  return { tasks: data, loading: !loaded && error === null, error, replace, remove, add }
 }

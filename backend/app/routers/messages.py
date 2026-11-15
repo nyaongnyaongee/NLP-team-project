@@ -31,7 +31,8 @@ def _view(msg, user) -> dict:
     """보는 사람에 맞게 걸러서 돌려준다.
     - 교사가 보낸 글(skip): 양쪽 모두 있는 그대로
     - 학부모 글을 교사가 볼 때: 명시적으로 통과한 글은 원문, 그 외 완료된 글은 정제문. 분석은 둘 다 주되 인용문(quotes)은 뺌
-    - 학부모가 자기 글을 볼 때: 자기가 쓴 원문만 (정제문 · 분석은 교사용이라 뺌)"""
+    - 학부모가 자기 글을 볼 때: 자기가 쓴 원문만 (정제문 · 분석은 교사용이라 뺌).
+      정제됐는지만 refined 로 알려 준다 (true = 교사에게 다듬어진 글로 감, 처리 전 · 실패 · 통과는 false)"""
     d = dict(msg)
     if d["status"] == "skip":
         return d
@@ -41,6 +42,7 @@ def _view(msg, user) -> dict:
         if d.get("analysis"):
             d["analysis"] = {k: v for k, v in d["analysis"].items() if k != "quotes"}
     else:
+        d["refined"] = d["status"] == "done" and d.get("needs_refinement") is True
         d["refined_text"] = None
         d["analysis"] = None
     return d
@@ -101,11 +103,13 @@ def _refine_in_background(msg_id: int, raw_text: str, conv_id: int) -> None:
 @router.post("/conversations/{conv_id}/messages", response_model=MessageOut, status_code=201)
 def send_message(conv_id: int, body: MessageIn, background: BackgroundTasks,
                  db: Session = Depends(get_db), user=Depends(current_user)):
-    _my_conversation(db, conv_id, user)
+    conv = _my_conversation(db, conv_id, user)
+    if conv["status"] == "closed":  # 종료된 대화는 끝. 학부모는 「＋ 새 문의」로 새 대화를 연다
+        raise HTTPException(409, "종료된 대화에는 메시지를 보낼 수 없습니다. 새 문의로 시작해 주세요")
     # 학부모 메시지는 정제 대기(pending) → 백그라운드에서 정제, 교사 메시지는 그대로(skip)
     status = "pending" if user["role"] == "parent" else "skip"
-    crud.reopen_if_closed(db, conv_id)  # 닫힌 대화에 새 글이 오면 다시 연다 (뽑아 둔 할 일 · 일정은 그대로)
     msg = crud.add_message(db, conv_id, user["id"], body.text, status)
+    crud.mark_read(db, conv_id, "teacher" if user["id"] == conv["teacher_id"] else "parent")  # 답장했으면 앞 글은 읽은 것
     hub.notify_conversation(conv_id)
     if status == "pending":
         background.add_task(_refine_in_background, msg["id"], body.text, conv_id)

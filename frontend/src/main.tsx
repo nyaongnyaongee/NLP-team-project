@@ -5,6 +5,7 @@ import App from './App.tsx'
 import './design/sky-tokens.css'
 import './design/sky-app.css'
 import './design/app-layout.css'
+import './design/ios-polish.css' // iOS 느낌 다듬기 (색 · 모양만, 빼면 예전 모양)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
