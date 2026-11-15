@@ -83,26 +83,29 @@ tailscale serve status
 
 ---
 
-# 맥에서 공개 주소 + QR 로 시연 (Tailscale Funnel)
+# 공개 주소 + QR 로 시연 (Tailscale Funnel) — 폰에 아무것도 안 깔기
 
-위 절차(serve)는 **같은 tailnet 기기만** 접속됩니다. 관객 폰에 아무것도 깔지 않고 QR 로 들어오게 하려면 Funnel 을 씁니다.
-**Funnel 주소는 인터넷 누구나 접속할 수 있습니다** (켜 둔 동안만).
+위 절차(serve)는 **같은 tailnet 기기만** 접속됩니다. 관객 폰마다 Tailscale 을 깔 수 없으니, 시연 때는 `-Funnel` 로 켭니다.
+Funnel 주소는 **인터넷 누구나** 접속할 수 있습니다 (켜 둔 동안만). 주소는 serve 와 같습니다 (`https://<호스트>.<tailnet>.ts.net`).
 
-## 처음 한 번
-- [ ] 맥에 Tailscale 설치(App Store) · 로그인. 관객 폰에는 필요 없음
-- [ ] 관리 콘솔 DNS: **MagicDNS** · **HTTPS Certificates** 켜기
-- [ ] 관리 콘솔 Machines: 기기 이름을 개인정보 없는 이름으로 (예: `eum-demo`) — 공개 주소와 인증서 공개 로그에 남음
-- [ ] `brew install qrencode` (QR 표시용, 없으면 주소만 나옴)
-- [ ] 처음 실행 때 Funnel 허용 링크가 나오면 열어서 허용
+## 처음 한 번 (위 1~4번에 더해)
+- [ ] 서버 PC에만 Tailscale 설치 · 로그인 (관객 폰에는 필요 없음)
+- [ ] 기기 이름에 개인 이름이 없게 (예: `eum-demo`). 공개 주소 · QR 에 그대로 보입니다 (3번)
+- [ ] 처음 `-Funnel` 로 켜면 Funnel 허용 링크가 나옵니다 → 열어서 허용 → 다시 실행
 
 ## 매번
-```bash
-bash deploy/start-demo-mac.sh            # 프런트를 바꿨으면 --build
+```powershell
+cd frontend; npm run build; cd ..        # 화면을 바꿨을 때만 (또는 -Build)
+powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1 -Funnel
 ```
-점검(Tailscale 연결 · 8000 포트) → 화면 빌드(dist 없을 때) → PostgreSQL → 백엔드 → 자체 점검(화면 200 · API 401 · /api/dev 404) → Funnel → 주소 · QR(`deploy/logs/qr.png`).
-**Ctrl+C** 하면 Funnel 닫기 · 백엔드 끄기 · (스크립트가 켰으면) PostgreSQL 끄기까지 합니다.
+- 마지막에 `폰에서 열 주소: https://...ts.net` 이 나오면 성공
+- **QR**: PC 의 Edge 나 Chrome 으로 그 주소를 열고 주소창의 공유(또는 QR) 아이콘 → QR 코드 → 이미지 저장. 주소가 바뀌지 않으니 한 번 만들어 발표 자료에 넣어 두면 됩니다
+- 끄기 (**반드시**): `powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1 -Stop` — 백엔드와 공개 주소를 같이 닫습니다. 끄지 않으면 계속 공개된 채로 남습니다
 
-- 켠 직후 몇 분은 일부 폰에서 「보안 연결을 할 수 없음」이 날 수 있습니다 → **시연 10분 전에 켜 두기**
-- 맥이 잠들면 끊깁니다 (뚜껑 닫지 않기)
-- 정제가 켜져 있어 학부모 글마다 Claude 비용이 듭니다. 시드 계정 비밀번호가 고정값이니 진짜 내용은 넣지 않기
-- 아이폰: **홈 화면에 추가한 앱**으로 쓰세요. Safari 탭에서는 대화 목록을 밀어서 나오는 「삭제」를 눌러도 확인 창이 안 뜹니다 (원인 미확인, 나중에 고칠 것)
+## 알아 둘 것 (실제로 해 본 결과, 2026-11-15 · 맥 + 아이폰)
+- 켠 직후 몇 분은 일부 폰에서 「보안 연결을 할 수 없음」이 납니다 (공개 중계 서버 일부에 설정이 늦게 퍼짐). **시연 10분 전에 켜고 폰으로 한 번 열어 보기**
+- 켜자마자 인터넷 봇이 `/graphql` 같은 주소를 찔러 봅니다 (모두 404/405 로 막힘). 시드 계정 비밀번호가 고정값이니 진짜 내용은 넣지 않기
+- 학부모 글마다 Claude 정제 비용(약 $0.006)이 듭니다. 콘솔에 사용 한도를 걸어 두기
+- 여럿이 같은 계정으로 들어오면 대화가 섞입니다 → 학부모 계정 `parent1`~`parent20` 을 나눠 주기
+- 아이폰은 **홈 화면에 추가한 앱**으로 쓰기. Safari 탭에서는 대화 목록을 밀어 나온 「삭제」를 눌러도 확인 창이 안 뜹니다 (원인 미확인)
+- PC 가 잠들면 끊깁니다 (위 4번 절전 끄기)

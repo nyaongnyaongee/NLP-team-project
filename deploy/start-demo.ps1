@@ -1,14 +1,17 @@
 ﻿# 이음 시연 기동 스크립트 (Windows PowerShell 5.1)
 #
 #   켜기:  powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1            (프런트를 새로 빌드하려면 -Build)
-#   끄기:  powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1 -Stop
+#   공개:  powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1 -Funnel    (QR 로 아무 폰이나 접속, 폰에 Tailscale 불필요)
+#   끄기:  powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1 -Stop      (Funnel 도 같이 닫힘)
 #
 # 하는 일: 사전 점검 -> PostgreSQL 서비스 -> 8000 포트 확인 -> 백엔드(app.server) 기동 -> 상태 확인
-#          -> tailscale serve(https 443 -> 127.0.0.1:8000) -> 자체 점검(/api/dev/* 가 막혀 있는지)
-# 비밀 값(.env 내용, 토큰)은 출력하거나 기록하지 않는다. tailscale funnel(공개 노출)은 쓰지 않는다.
+#          -> tailscale serve(https 443 -> 127.0.0.1:8000) 또는 -Funnel 이면 tailscale funnel(인터넷 공개)
+#          -> 자체 점검(/api/dev/* 가 막혀 있는지)
+# 비밀 값(.env 내용, 토큰)은 출력하거나 기록하지 않는다. funnel(공개 노출)은 -Funnel 을 줄 때만 쓴다.
 param(
     [switch]$Build,
-    [switch]$Stop
+    [switch]$Stop,
+    [switch]$Funnel
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,8 +73,11 @@ if ($Stop) {
     if ($p) { Stop-Process -Id $p.Id -Force; Ok "백엔드(PID $($p.Id))를 껐습니다." } else { Warn '이 스크립트가 켠 백엔드가 없습니다.' }
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force }
     if ($ts) {
-        Warn 'tailscale serve(443) 설정을 해제합니다.'
-        & $ts serve --https=443 off
+        Warn 'tailscale funnel · serve(443) 설정을 해제합니다.'
+        & { $ErrorActionPreference = 'Continue'; & $ts funnel --https=443 off 2>&1 | Out-Null }
+        & { $ErrorActionPreference = 'Continue'; & $ts serve --https=443 off 2>&1 | Out-Null }
+        $left = & { $ErrorActionPreference = 'Continue'; & $ts funnel status 2>&1 | Out-String }
+        if ($left -match 'Funnel on') { Warn "아직 공개 설정이 남아 있습니다. tailscale funnel reset 으로 지우세요.`n$left" } else { Ok '공개 주소 닫힘' }
     }
     exit 0
 }
@@ -185,17 +191,25 @@ if ($rootMap -and $rootMap -notmatch [regex]::Escape($target)) {
     if ($answer -ne 'y') { Fail '기존 Serve 매핑이 남아 있습니다.' 'tailscale serve status 로 확인한 뒤 직접 정리하고 다시 실행하세요.' }
     & $ts serve --https=443 off
 }
-& $ts serve --bg --https=443 "http://$target"
-if ($LASTEXITCODE -ne 0) { Fail 'tailscale serve 설정에 실패했습니다.' 'tailscale status 로 로그인 상태를, 관리 콘솔에서 MagicDNS / HTTPS Certificates 가 켜져 있는지 확인하세요.' }
-Ok 'tailscale serve 설정 완료'
+if ($Funnel) {
+    Warn 'Funnel: 이 주소는 인터넷 누구나 접속할 수 있습니다 (끄기 전까지).'
+    & $ts funnel --bg --https=443 "http://$target"
+    if ($LASTEXITCODE -ne 0) { Fail 'tailscale funnel 설정에 실패했습니다.' '처음이면 위에 나온 링크를 열어 Funnel 을 허용한 뒤 다시 실행하세요. (deploy\README.md 「Funnel」 절)' }
+    Ok 'tailscale funnel 설정 완료 (공개)'
+} else {
+    & $ts serve --bg --https=443 "http://$target"
+    if ($LASTEXITCODE -ne 0) { Fail 'tailscale serve 설정에 실패했습니다.' 'tailscale status 로 로그인 상태를, 관리 콘솔에서 MagicDNS / HTTPS Certificates 가 켜져 있는지 확인하세요.' }
+    Ok 'tailscale serve 설정 완료'
+}
 
 # ------------------------------------------------------------------ 7. 자체 점검
 Step '7. 자체 점검'
 $dev = Get-HttpStatus 'POST' "$Base/api/dev/reset"
 if ($dev -ne 404) {
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    Warn 'tailscale serve 를 해제합니다 (안전하지 않은 상태).'
-    & $ts serve --https=443 off
+    Warn 'tailscale funnel · serve 를 해제합니다 (안전하지 않은 상태).'
+    & { $ErrorActionPreference = 'Continue'; & $ts funnel --https=443 off 2>&1 | Out-Null }
+    & { $ErrorActionPreference = 'Continue'; & $ts serve --https=443 off 2>&1 | Out-Null }
     Fail "/api/dev/reset 이 404 가 아니라 $dev 를 돌려주었습니다. 서버를 껐습니다." 'DEV_TOOLS 설정이 남아 있지 않은지 확인하세요.'
 }
 Ok '/api/dev/reset 404 (차단됨)'
@@ -208,5 +222,11 @@ Write-Host $final
 Step '8. 완료'
 $url = [regex]::Match($final, 'https://[A-Za-z0-9.\-]+\.ts\.net').Value
 if ($url) { Write-Host "폰에서 열 주소: $url" -ForegroundColor Green } else { Warn '주소를 상태 출력에서 찾지 못했습니다. 위 tailscale serve status 를 보세요.' }
-Write-Host '폰은 Tailscale 앱이 켜져 있어야 접속됩니다. 설치(홈 화면 추가) 방법은 deploy\README.md 6번.'
+if ($Funnel) {
+    Write-Host '폰에 Tailscale 이 없어도 접속됩니다. QR: PC 의 Edge/Chrome 으로 위 주소를 열고 주소창의 공유(또는 QR) 아이콘 → QR 코드.'
+    Warn '켠 직후 몇 분은 일부 폰에서 「보안 연결을 할 수 없음」이 날 수 있습니다. 시연 10분 전에 켜고 폰으로 한 번 확인하세요.'
+    Warn '인터넷 누구나 접속 가능: 시드 계정 비밀번호가 고정값이니 진짜 내용은 넣지 말고, 끝나면 반드시 -Stop.'
+} else {
+    Write-Host '폰은 Tailscale 앱이 켜져 있어야 접속됩니다. 설치(홈 화면 추가) 방법은 deploy\README.md 6번.'
+}
 Write-Host '끄기: powershell -ExecutionPolicy Bypass -File deploy\start-demo.ps1 -Stop'
