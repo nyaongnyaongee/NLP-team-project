@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../api/client'
-import { closeConversation, extractAgain } from '../../api/conversations'
+import { closeConversation, deleteConversation, extractAgain } from '../../api/conversations'
 import { refineMessage, sendMessage } from '../../api/messages'
 import { listTasks } from '../../api/tasks'
 import type { Conversation, Task } from '../../api/types'
@@ -9,27 +9,34 @@ import { formatTime } from '../chat/formatTime'
 import MessageForm, { type MessageFormHandle } from '../chat/MessageForm'
 import { teacherView } from '../chat/messageText'
 import { useConversation } from '../chat/useConversation'
+import { useMarkRead } from '../chat/useMarkRead'
 import { useMessages } from '../chat/useMessages'
 import { useResource } from '../chat/useResource'
 import CandidatePanel from '../tasks/CandidatePanel'
-import ReplyDraftPanel from './ReplyDraftPanel'
+import ReplyDraftPanel, { DraftToggle } from './ReplyDraftPanel'
+import { MemoPanel, MemoToggle } from './StudentMemo'
+import { useStudentMemo } from './useStudentMemo'
 
 const NO_TASKS: Task[] = []
 
 // 교사 대화방. 대화를 바꾸면 부모가 key 로 새로 만들어 이전 대화의 글이 남지 않는다.
 // onLeave: 권한이 없거나(403) 대화를 찾을 수 없을 때(404) 목록으로 돌아간다 (명세 3.1).
 // onBack: "‹ 대화 목록" 으로 돌아간다.
+// onDeleted: 종료된 대화를 지운 뒤 (목록에서 빼고 돌아간다)
 export default function TeacherThread({
   conversation: initial,
   onLeave,
   onBack,
+  onDeleted,
 }: {
   conversation: Conversation
   onLeave: (message: string) => void
   onBack: () => void
+  onDeleted: (id: number) => void
 }) {
   const { conversation, setConversation, refresh: refreshConversation } = useConversation(initial)
   const { messages, loading, error, upsert, refresh: refreshMessages } = useMessages(initial.id)
+  useMarkRead(initial.id, messages)
 
   const closed = conversation.status === 'closed'
 
@@ -64,6 +71,10 @@ export default function TeacherThread({
   const [sentCount, setSentCount] = useState(0)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [closing, setClosing] = useState(false)
+  const [draftOpen, setDraftOpen] = useState(false) // 「AI 초안」 메모 칸
+  const [memoOpen, setMemoOpen] = useState(false) // 학생 메모 칸
+  const memo = useStudentMemo(conversation.student_id ?? null) // 「대화 종료」를 눌러 고르는 중 (뽑고 닫기 · 그냥 닫기)
   const busyRef = useRef(false) // 연타로 같은 동작이 두 번 나가는 것을 막는다
 
   // 종료, 다시 뽑기, 다시 정제가 함께 쓰는 실행기. 오류는 3.1 표대로 문장을 보여 주고, 403·404 는 목록으로 돌아간다.
@@ -84,11 +95,20 @@ export default function TeacherThread({
     }
   }
 
-  const onClose = () => {
-    if (!window.confirm('대화를 종료할까요? 종료하면 할 일과 일정 후보를 뽑습니다.')) return
+  // extract: true = 할 일·일정 후보를 뽑으며 닫기, false = 닫기만 (나중에 「할 일·일정 뽑기」로 뽑을 수 있음)
+  const onClose = (extract: boolean) => {
+    setClosing(false)
     void run(async () => {
-      setConversation(await closeConversation(conversation.id))
+      setConversation(await closeConversation(conversation.id, extract))
       refreshAll()
+    })
+  }
+
+  const onDelete = () => {
+    if (!window.confirm('이 대화를 목록에서 삭제할까요?')) return
+    void run(async () => {
+      await deleteConversation(conversation.id)
+      onDeleted(conversation.id)
     })
   }
 
@@ -108,26 +128,56 @@ export default function TeacherThread({
   async function onSend(text: string) {
     upsert(await sendMessage(conversation.id, text))
     setSentCount((n) => n + 1)
+    setDraftOpen(false)
     refreshAll()
   }
 
   const extract = conversation.extract
 
   return (
-    <section>
+    <section className="chat-screen">
       <div className="chat-head">
         <button type="button" className="back" onClick={onBack}>
           ‹ 대화 목록
         </button>
-        <span className="tag">{closed ? '종료된 대화' : '대화 중'}</span>
+        {closed ? (
+          <span className="tag">종료된 대화</span>
+        ) : (
+          <button type="button" className="head-action" onClick={() => setClosing((v) => !v)} disabled={busy}>
+            대화 종료
+          </button>
+        )}
       </div>
+      {!closed && closing && (
+        <div className="close-choice" role="group" aria-label="대화 종료 방법">
+          <p className="info">대화를 종료할까요? 할 일·일정 후보는 종료한 뒤에도 뽑을 수 있습니다.</p>
+          <button type="button" className="primary" onClick={() => onClose(true)} disabled={busy}>
+            종료하고 할 일·일정 뽑기
+          </button>
+          <button type="button" className="outline" onClick={() => onClose(false)} disabled={busy}>
+            그냥 종료
+          </button>
+          <button type="button" className="back" onClick={() => setClosing(false)}>
+            취소
+          </button>
+        </div>
+      )}
       <div className="chat-person">
         <span className="avatar">{conversation.student_name.slice(0, 1)}</span>
         <div>
           <b>{conversation.student_name}</b>
         </div>
+        {conversation.student_id != null && (
+          <MemoToggle memo={memo} open={memoOpen} onToggle={() => setMemoOpen((o) => !o)} />
+        )}
       </div>
+      {conversation.student_id != null && memoOpen && <MemoPanel memo={memo} studentName={conversation.student_name} />}
 
+      {closed && !extract && (
+        <button type="button" className="outline" onClick={onExtractAgain} disabled={busy}>
+          할 일·일정 뽑기
+        </button>
+      )}
       {closed && extract && (
         <div>
           {extract.status === 'pending' && (
@@ -194,7 +244,7 @@ export default function TeacherThread({
         })}
       </ul>
 
-      {/* 종료된 대화에는 교사의 입력창을 숨긴다: 서버는 누가 보내든 대화를 다시 열기 때문 (경미 6) */}
+      {/* 종료된 대화에는 입력창을 숨긴다: 서버가 종료된 대화의 글을 막는다 (409) */}
       {closed ? (
         <>
           <div className="closed-note">이 대화는 종료되었습니다.</div>
@@ -205,23 +255,26 @@ export default function TeacherThread({
             onUpdated={(t) => setCandidates((prev) => prev.map((p) => (p.id === t.id ? t : p)))}
             onRemoved={(id) => setCandidates((prev) => prev.filter((p) => p.id !== id))}
           />
+          <button type="button" className="delete-item" onClick={onDelete} disabled={busy}>
+            대화 삭제
+          </button>
         </>
       ) : (
         <>
           {/* 초안은 입력창에 채워질 뿐 자동으로 보내지 않는다. 보내면 패널을 새로 만들어 이전 초안의 확인 항목을 지운다 (S7) */}
-          <ReplyDraftPanel key={sentCount} conversationId={conversation.id} formRef={formRef} />
-          <MessageForm
-            id="teacher-reply"
-            label="답장"
-            onSend={onSend}
-            handleRef={formRef}
-            extraAction={
-              <button type="button" className="end" onClick={onClose} disabled={busy}>
-                대화 종료
-              </button>
-            }
-          />
-          <div className="info">대화를 종료하면 할 일과 일정 후보를 정리합니다.</div>
+          {/* 입력창은 화면 아래에 붙어 있다 (메시지가 길어도 스크롤해도 보임) */}
+          <div className="chat-compose">
+            <MessageForm
+              id="teacher-reply"
+              label="답장 쓰기"
+              onSend={onSend}
+              handleRef={formRef}
+              headerAction={<DraftToggle open={draftOpen} onToggle={() => setDraftOpen((o) => !o)} />}
+              beforeInput={
+                <ReplyDraftPanel key={sentCount} conversationId={conversation.id} formRef={formRef} open={draftOpen} />
+              }
+            />
+          </div>
         </>
       )}
     </section>

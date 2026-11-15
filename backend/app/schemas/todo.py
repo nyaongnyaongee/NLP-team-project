@@ -7,9 +7,10 @@ from pydantic import BaseModel, Field
 
 class TaskOut(BaseModel):
     id: int
-    conversation_id: int
-    student_name: str
+    conversation_id: int | None  # None = 교사가 직접 등록한 반 전체 일정
+    student_name: str | None
     kind: Literal["todo", "event"]
+    shared: bool = True  # 일정: 학부모 캘린더에 보임
     title: str
     due_text: str | None  # 대화에 적힌 표현 그대로 (「다음 주 화요일」)
     due_at: datetime | None  # 바꾼 날짜. 시각이 없으면 그날 00:00 (한국 시각)
@@ -22,6 +23,30 @@ class TaskPatch(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=100)
     due_at: datetime | None = None
     status: Literal["candidate", "added", "done"] | None = None
+    shared: bool | None = None  # 일정만: 학부모와 공유
+
+
+class EventIn(BaseModel):
+    """교사가 직접 등록하는 반 전체 일정."""
+    title: str = Field(min_length=1, max_length=100)
+    due_at: datetime | None = None
+    shared: bool = True
+
+
+class ParentEventOut(BaseModel):
+    """학부모 캘린더의 일정 (공유된 것만)."""
+    id: int
+    conversation_id: int | None
+    student_name: str | None
+    teacher_name: str
+    title: str
+    due_text: str | None
+    due_at: datetime | None
+    status: Literal["added", "done"]
+
+
+class ConversationCloseIn(BaseModel):
+    extract: bool = True  # False 면 할 일 · 일정을 뽑지 않고 닫기만 (나중에 POST /extract 로 뽑을 수 있음)
 
 
 class ConversationStartIn(BaseModel):

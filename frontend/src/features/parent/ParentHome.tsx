@@ -1,12 +1,14 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from '../../components/AppShell'
 import BottomNav, { type NavItem } from '../../components/BottomNav'
-import { ChatIcon, NoticeIcon } from '../../components/icons'
+import { CalendarIcon, ChatIcon, NoticeIcon } from '../../components/icons'
 import ParentNotices from '../notices/ParentNotices'
+import ParentCalendar from './ParentCalendar'
 import ParentConversationTab from './ParentConversationTab'
 
 const NAV: NavItem[] = [
   { to: '/parent', label: '대화', icon: <ChatIcon />, end: true },
+  { to: '/parent/calendar', label: '캘린더', icon: <CalendarIcon /> },
   { to: '/parent/notices', label: '공지사항', icon: <NoticeIcon /> },
 ]
 
@@ -16,6 +18,7 @@ export default function ParentHome() {
     <AppShell title="학부모" nav={<BottomNav items={NAV} label="학부모 메뉴" />}>
       <Routes>
         <Route index element={<ParentConversationTab />} />
+        <Route path="calendar" element={<ParentCalendar />} />
         <Route path="notices/*" element={<ParentNotices />} />
         <Route path="*" element={<Navigate to="/parent" replace />} />
       </Routes>

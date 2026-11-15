@@ -1,7 +1,9 @@
 # 테스트 데이터 넣기  [어령]   실행: cd backend && python -m app.db.seed
 # 여러 번 돌려도 된다: 없는 계정 · 학생만 더하고, 대화는 처음 만들 때만 넣는다.
 # 학생: teacher1 반 = ai/sample_roster.json 20명 (가명처리 명단과 같은 이름). 예전 DB 의 대화 학생도 반에 넣는다.
-# 가족: 학생 20명마다 학부모 계정 하나 (parent1 ↔ 지민 … parent20 ↔ 은우, sample_roster.json 순서). 비밀번호 모두 test1234
+# 가족: 학생 20명마다 학부모 계정 하나 (parent1 ↔ 박지민 … parent20 ↔ 홍은우, sample_roster.json 순서). 비밀번호 모두 test1234
+# 학생 이름 = 학부모 성 + sample_roster.json 의 이름 (가명처리기는 성을 떼고 두 글자 이름으로 훑으므로 명단 파일은 이름만 둔다).
+# 예전 DB 에 성 없이 들어간 학생 · 대화 이름은 돌릴 때 성 붙은 이름으로 바꾼다.
 from sqlalchemy import text
 
 from app.ai.roster import load_sample_roster
@@ -25,7 +27,8 @@ USERS = [  # (role, name, login_id)
     *[("parent", name, login) for login, name, _ in FAMILIES],
     ("complaint_team", "정하은", "team1"),  # 민원대응팀 (신고 보고서 D 를 본다)
 ]
-SEED_CHILDREN = [(login, child) for login, _, child in FAMILIES]  # 학부모 ↔ 아이
+FULL = {child: parent_name[0] + child for _, parent_name, child in FAMILIES}  # 지민 → 박지민
+SEED_CHILDREN = [(login, FULL[child]) for login, _, child in FAMILIES]  # 학부모 ↔ 아이 (성 붙은 이름)
 FIRST_CONVERSATIONS = SEED_CHILDREN[:2]  # 처음 만들 때 대화 2개 (parent1 ↔ 지민, parent2 ↔ 민준)
 
 with SessionLocal() as db:
@@ -47,7 +50,15 @@ with SessionLocal() as db:
                 {"t": ids["teacher1"], "p": ids[parent], "s": student},
             )
     teacher = db.execute(text("SELECT id FROM users WHERE login_id = 'teacher1'")).scalar()
-    names = load_sample_roster() + [r[0] for r in db.execute(
+    renamed = 0
+    for given, full in FULL.items():  # 예전 DB: 성 없는 이름 → 성 붙은 이름 (이미 성 붙은 학생이 있으면 그대로)
+        renamed += db.execute(text(
+            "UPDATE students SET name = :f WHERE teacher_id = :t AND name = :g "
+            "AND NOT EXISTS (SELECT 1 FROM students WHERE teacher_id = :t AND name = :f)"),
+            {"t": teacher, "g": given, "f": full}).rowcount
+        db.execute(text("UPDATE conversations SET student_name = :f WHERE teacher_id = :t AND student_name = :g"),
+                   {"t": teacher, "g": given, "f": full})
+    names = [FULL[n] for n in load_sample_roster()] + [r[0] for r in db.execute(
         text("SELECT DISTINCT student_name FROM conversations WHERE teacher_id = :t"), {"t": teacher}).all()]
     new_students = 0
     for name in dict.fromkeys(names):
@@ -70,5 +81,7 @@ with SessionLocal() as db:
         added.append(f"학생 {new_students}명")
     if linked:
         added.append(f"학생 ↔ 학부모 {linked}쌍")
+    if renamed:
+        added.append(f"학생 이름에 성 {renamed}명")
     db.commit()
     print("시드: " + (", ".join(added) + " 추가" if added else "이미 다 있음 (건너뜀)") + "  (비밀번호 모두 test1234)")

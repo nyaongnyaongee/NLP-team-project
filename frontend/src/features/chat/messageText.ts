@@ -8,7 +8,7 @@ export type TeacherView =
   | { kind: 'failed'; reason: string | null }
   | { kind: 'empty' } // 완료인데 보여줄 글이 없는 경우, 알 수 없는 상태
 
-export type ParentView = { kind: 'text'; text: string }
+export type ParentView = { kind: 'text'; text: string; refined: boolean }
 
 function errorOf(analysis: Message['analysis']): string | null {
   const e = analysis?.error
@@ -33,7 +33,7 @@ export function teacherView(m: Message): TeacherView {
   }
 }
 
-// 학부모 화면. status 는 보지 않는다 (중대 5).
+// 학부모 화면. status 는 보지 않는다 (중대 5). 정제됐는지는 서버가 준 refined 로만 안다.
 export function parentView(m: Message): ParentView {
-  return { kind: 'text', text: m.raw_text ?? '' }
+  return { kind: 'text', text: m.raw_text ?? '', refined: m.refined === true }
 }

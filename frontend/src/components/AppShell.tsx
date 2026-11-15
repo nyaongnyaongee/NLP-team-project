@@ -20,6 +20,7 @@ export default function AppShell({
     <div className="stage">
       <div className="phone-shell">
         <section className="phone" aria-label="이음">
+          {/* 위 막대: 작은 로고 · 학교 이름, 오른쪽에 프로필 단추 (계정 · 로그아웃은 그 안에) */}
           <header className="top">
             <div className="brand-row">
               <div className="brand">
@@ -29,7 +30,7 @@ export default function AppShell({
               </div>
               <span className="school-name">{SCHOOL_NAME}</span>
             </div>
-            <AccountBar />
+            <AccountBar school={SCHOOL_NAME} />
           </header>
           <main className="content">
             <h1 className="sr-only">{title}</h1>

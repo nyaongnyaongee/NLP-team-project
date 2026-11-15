@@ -52,6 +52,13 @@ UPGRADES = [
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS extract JSONB",                         # C 추출 상태
     "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()",
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS needs_refinement BOOLEAN",                   # 정제 여부 (원문 통과)
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS teacher_deleted_at TIMESTAMPTZ",        # 교사 목록에서 지움 (DB 엔 남김)
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS parent_deleted_at TIMESTAMPTZ",         # 학부모 목록에서 지움 (DB 엔 남김)
+    "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS teacher_id BIGINT REFERENCES users(id)",        # 직접 등록한 일정
+    "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS shared BOOLEAN NOT NULL DEFAULT true",          # 학부모 캘린더에 공유
+    "ALTER TABLE tasks ALTER COLUMN conversation_id DROP NOT NULL",                             # 반 전체 일정은 대화 없음
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS teacher_read_id BIGINT",                # 안 읽은 메시지 수
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS parent_read_id BIGINT",
     # 공지 테이블 (schema.sql 의 것과 같게)
     """CREATE TABLE IF NOT EXISTS notices (
       id         BIGSERIAL PRIMARY KEY,

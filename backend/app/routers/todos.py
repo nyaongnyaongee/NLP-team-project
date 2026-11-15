@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.auth import current_user
 from app.db import crud
 from app.db.database import get_db
-from app.schemas.todo import TaskOut, TaskPatch
+from app.routers.ws import hub
+from app.schemas.todo import ParentEventOut, TaskOut, TaskPatch
 
 
 def task_router(kind: str, path: str, tag: str) -> APIRouter:
@@ -19,35 +20,44 @@ def task_router(kind: str, path: str, tag: str) -> APIRouter:
 
     def _my_task(db: Session, task_id: int, user):
         task = crud.get_task(db, task_id)
-        if task is None or task["kind"] != kind or task["teacher_id"] != user["id"]:
+        if task is None or task["kind"] != kind or task["owner_id"] != user["id"]:
             raise HTTPException(404, "찾을 수 없습니다")
         return task
 
-    @router.get(f"/{path}", response_model=list[TaskOut])
+    def _notify_parents(db: Session, task) -> None:
+        """일정이 바뀌면 그 일정을 볼 수 있는 학부모 화면이 다시 불러오게 (내용은 GET 으로)."""
+        if kind == "event" and task is not None:
+            hub.notify_users(crud.event_audience(db, task), {"type": "events"})
+
+    @router.get(f"/{path}", response_model=list[TaskOut] | list[ParentEventOut])
     def list_(status: str | None = Query(None, pattern="^(candidate|added|done)$"),
               conversation_id: int | None = None,
               db: Session = Depends(get_db), user=Depends(current_user)):
+        if kind == "event" and user["role"] == "parent":  # 학부모 캘린더: 공유된 일정만
+            return [ParentEventOut(**t) for t in crud.parent_events(db, user["id"])]
         _need_teacher(user)
-        return [dict(t) for t in crud.list_tasks(db, user["id"], kind, status, conversation_id)]
+        return [TaskOut(**t) for t in crud.list_tasks(db, user["id"], kind, status, conversation_id)]
 
     @router.patch(f"/{path}/{{task_id}}", response_model=TaskOut)
     def update(task_id: int, body: TaskPatch, db: Session = Depends(get_db), user=Depends(current_user)):
-        """[추가] = {"status": "added"}, [완료] = {"status": "done"}, 제목 · 날짜 고치기."""
+        """[추가] = {"status": "added"}, [완료] = {"status": "done"}, 제목 · 날짜 고치기, 일정 공유 켜고 끄기."""
         _need_teacher(user)
         _my_task(db, task_id, user)
         fields = {k: getattr(body, k) for k in body.model_fields_set}
-        if fields.get("title") is None:
-            fields.pop("title", None)  # 제목은 지울 수 없다
-        if fields.get("status") is None:
-            fields.pop("status", None)
+        for key in ("title", "status", "shared"):  # 제목은 지울 수 없고, 상태 · 공유는 값이 있어야
+            if fields.get(key) is None:
+                fields.pop(key, None)
         crud.update_task(db, task_id, fields)
-        return dict(_my_task(db, task_id, user))
+        task = _my_task(db, task_id, user)
+        _notify_parents(db, task)
+        return TaskOut(**task)
 
     @router.delete(f"/{path}/{{task_id}}", status_code=204)
     def delete(task_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
         _need_teacher(user)
-        _my_task(db, task_id, user)
+        task = _my_task(db, task_id, user)
         crud.delete_task(db, task_id)
+        _notify_parents(db, task)
 
     return router
 
