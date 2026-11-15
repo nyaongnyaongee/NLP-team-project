@@ -2,11 +2,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
 from app.routers import auth, conversations, drafts, events, messages, notices, reports, students, todos, ws
 
 app = FastAPI(title="이음")
 app.add_middleware(
-    CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.include_router(auth.router)
 app.include_router(conversations.router)

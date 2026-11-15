@@ -24,6 +24,19 @@ log = logging.getLogger("routers.ws")
 router = APIRouter(tags=["ws"])
 
 TOKEN_WAIT_SECONDS = 5
+PING_INTERVAL_SECONDS = 25  # 유휴 연결이 프록시 · 통신망에서 끊기지 않게 서버가 먼저 신호를 보낸다 (호출 시점에 읽는다)
+
+
+async def _ping_loop(user_id: int, websocket: WebSocket) -> None:
+    """연결이 열려 있는 동안 주기적으로 {"type": "ping"} 을 보낸다. 내용은 싣지 않는다. 보내기가 실패하면 연결을 정리한다."""
+    try:
+        while True:
+            await asyncio.sleep(PING_INTERVAL_SECONDS)
+            await websocket.send_json({"type": "ping"})
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        hub.remove(user_id, websocket)
 
 
 class Hub:
@@ -102,11 +115,16 @@ async def ws_endpoint(websocket: WebSocket):
         return
 
     hub.add(user["id"], websocket)
-    await websocket.send_json({"type": "ready"})
+    ping_task = None
     try:
+        await websocket.send_json({"type": "ready"})
+        ping_task = asyncio.create_task(_ping_loop(user["id"], websocket))
         while True:  # 화면이 보내는 것은 없다. 연결이 끊길 때까지 기다린다
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     finally:
+        if ping_task is not None:
+            ping_task.cancel()
+            await asyncio.gather(ping_task, return_exceptions=True)
         hub.remove(user["id"], websocket)

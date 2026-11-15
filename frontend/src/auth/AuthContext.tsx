@@ -18,6 +18,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearSession()
     setSession(null)
+    // 방어적: 앱 셸 캐시에는 사용자 데이터가 없지만, 로그아웃하면 Cache Storage 를 전부 비운다. 실패해도 로그아웃은 막지 않는다.
+    if (typeof caches !== 'undefined') {
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .catch(() => {})
+    }
   }, [])
 
   const login = useCallback(async (loginId: string, password: string) => {
