@@ -58,7 +58,7 @@ export default function ParentChat({
   }
 
   return (
-    <section>
+    <section className="chat-screen">
       <div className="chat-head">
         <button type="button" className="back" onClick={onBack}>
           ‹ 대화 목록
