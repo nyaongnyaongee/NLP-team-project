@@ -72,6 +72,51 @@ def test_토큰이_틀리면_끊는다(client, first):
         assert e.value.code == 1008
 
 
+def test_서버가_주기적으로_ping_을_보내고_그_뒤에도_알림은_온다(client, auth, ids, monkeypatch):
+    from app.routers import ws as ws_mod
+
+    monkeypatch.setattr(ws_mod, "PING_INTERVAL_SECONDS", 0.05)
+    conv = ids["conv_parent1"]
+    ctx, teacher = connect(client, auth, "teacher1")
+    try:
+        assert teacher.receive_json() == {"type": "ping"}
+        assert teacher.receive_json() == {"type": "ping"}
+        send(client, auth, "parent1", conv)
+        got = []
+        while {"type": "changed", "conversation_id": conv} not in got:  # ping 이 섞여 와도 알림이 도착해야 한다
+            got.append(teacher.receive_json())
+            assert len(got) < 50
+    finally:
+        ctx.__exit__(None, None, None)
+
+
+def test_연결이_끝나면_ping_작업이_취소된다(client, auth, monkeypatch):
+    import time
+
+    from app.routers import ws as ws_mod
+
+    real_loop = ws_mod._ping_loop
+    state = {"started": 0, "finished": 0}
+
+    async def watched(user_id, websocket):
+        state["started"] += 1
+        try:
+            await real_loop(user_id, websocket)
+        finally:
+            state["finished"] += 1  # 취소돼도 여기를 지난다
+
+    monkeypatch.setattr(ws_mod, "_ping_loop", watched)
+    monkeypatch.setattr(ws_mod, "PING_INTERVAL_SECONDS", 0.05)
+    ctx, conn = connect(client, auth, "teacher1")
+    assert conn.receive_json() == {"type": "ping"}
+    ctx.__exit__(None, None, None)
+    for _ in range(100):  # 서버 쪽 정리는 비동기라 잠깐 기다린다
+        if state["finished"] == state["started"] == 1:
+            break
+        time.sleep(0.02)
+    assert state == {"started": 1, "finished": 1}
+
+
 def test_연결한_사람이_없으면_알림은_아무_일도_안_한다(ids):
     from app.routers.ws import Hub
 

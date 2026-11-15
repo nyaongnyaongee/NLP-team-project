@@ -21,3 +21,7 @@ dist/
 
 # 평가 스크립트가 만드는 결과물
 ai-eval/output/
+
+# 시연 서버 실행 기록 (deploy/start-demo.ps1)
+deploy/run/
+deploy/logs/
