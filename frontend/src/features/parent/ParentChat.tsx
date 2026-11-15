@@ -59,17 +59,16 @@ export default function ParentChat({
 
   return (
     <section className="chat-screen">
-      <div className="chat-head">
-        <button type="button" className="back" onClick={onBack}>
-          ‹ 대화 목록
+      {/* 머리 한 줄: ‹ · 아바타 · 이름 ··· 대화 상태 */}
+      <div className="chat-bar">
+        <button type="button" className="bar-back" onClick={onBack} aria-label="대화 목록으로">
+          ‹
         </button>
-        <span className="tag">{conversation.status === 'closed' ? '종료된 대화' : '대화 중'}</span>
-      </div>
-      <div className="chat-person">
         <span className="avatar">{conversation.student_name.slice(0, 1)}</span>
-        <div>
-          <b>{conversation.student_name}</b>
-        </div>
+        <b className="bar-title">{conversation.student_name}</b>
+        <span className="bar-actions">
+          <span className="tag">{conversation.status === 'closed' ? '종료됨' : '대화 중'}</span>
+        </span>
       </div>
       {loading && messages.length === 0 && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}

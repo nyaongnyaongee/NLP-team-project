@@ -136,17 +136,25 @@ export default function TeacherThread({
 
   return (
     <section className="chat-screen">
-      <div className="chat-head">
-        <button type="button" className="back" onClick={onBack}>
-          ‹ 대화 목록
+      {/* 머리 한 줄: ‹ · 아바타 · 이름 ··· 메모 · 종료 (메시지 앱처럼) */}
+      <div className="chat-bar">
+        <button type="button" className="bar-back" onClick={onBack} aria-label="대화 목록으로">
+          ‹
         </button>
-        {closed ? (
-          <span className="tag">종료된 대화</span>
-        ) : (
-          <button type="button" className="head-action" onClick={() => setClosing((v) => !v)} disabled={busy}>
-            대화 종료
-          </button>
-        )}
+        <span className="avatar">{conversation.student_name.slice(0, 1)}</span>
+        <b className="bar-title">{conversation.student_name}</b>
+        <span className="bar-actions">
+          {conversation.student_id != null && (
+            <MemoToggle open={memoOpen} onToggle={() => setMemoOpen((o) => !o)} />
+          )}
+          {closed ? (
+            <span className="tag">종료됨</span>
+          ) : (
+            <button type="button" className="head-action" onClick={() => setClosing((v) => !v)} disabled={busy}>
+              종료
+            </button>
+          )}
+        </span>
       </div>
       {!closed && closing && (
         <div className="close-choice" role="group" aria-label="대화 종료 방법">
@@ -162,15 +170,6 @@ export default function TeacherThread({
           </button>
         </div>
       )}
-      <div className="chat-person">
-        <span className="avatar">{conversation.student_name.slice(0, 1)}</span>
-        <div>
-          <b>{conversation.student_name}</b>
-        </div>
-        {conversation.student_id != null && (
-          <MemoToggle memo={memo} open={memoOpen} onToggle={() => setMemoOpen((o) => !o)} />
-        )}
-      </div>
       {conversation.student_id != null && memoOpen && <MemoPanel memo={memo} studentName={conversation.student_name} />}
 
       {closed && !extract && (

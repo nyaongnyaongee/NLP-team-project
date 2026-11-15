@@ -2,12 +2,11 @@ import type { StudentMemoState } from './useStudentMemo'
 
 const MAX = 20000 // 서버 MemoIn.body 최대 길이
 
-// 이름 옆 작은 알약 「✎ 메모 ●」. 메모가 있으면 파란 점.
-export function MemoToggle({ memo, open, onToggle }: { memo: StudentMemoState; open: boolean; onToggle: () => void }) {
+// 이름 옆 작은 알약 「✎ 메모」.
+export function MemoToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button type="button" className={`memo-toggle${open ? ' on' : ''}`} onClick={onToggle} aria-expanded={open}>
       ✎ 메모
-      {memo.hasMemo && <span className="memo-dot" aria-label="메모 있음" />}
     </button>
   )
 }

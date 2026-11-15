@@ -783,9 +783,47 @@ input.notice-input.student-search {
   }
 }
 
-/* 대화방: 「‹ 대화 목록 · 대화 종료」 줄과 이름 줄 사이 가로선 */
-.chat-screen .chat-head {
-  padding-bottom: 12px;
-  margin-bottom: 14px;
+/* 대화방 머리 한 줄 (‹ · 아바타 · 이름 ··· 단추들), 아래 선 하나 */
+.chat-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 12px;
+  margin: -6px 0 4px;
   border-bottom: 0.5px solid var(--ios-hairline);
+}
+.bar-back {
+  flex-shrink: 0;
+  width: 28px;
+  height: 36px;
+  margin-left: -6px;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 300;
+  padding: 0 0 4px;
+}
+.chat-bar .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.bar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
