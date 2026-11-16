@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Notice } from './types'
+import type { Notice, NoticeComment } from './types'
 
 // 교사: 자기 공지 전부(초안 포함). 학부모: 받은 공지(게시된 것만). 서버가 역할로 거른다.
 export function listNotices(): Promise<Notice[]> {
@@ -23,4 +23,17 @@ export async function deleteNotice(id: number): Promise<void> {
 // 게시: 반 학생의 학부모 모두에게 보이게 된다 (+ 대화가 있는 학부모). 다시 게시하면 409.
 export function sendNotice(id: number): Promise<Notice> {
   return request<Notice>(`/notices/${id}/send`, { method: 'POST' })
+}
+
+// 댓글: 게시된 공지에만. 교사(그 공지를 쓴) · 받는 학부모가 보고 쓴다. 지우기 = 쓴 사람 또는 공지를 쓴 교사.
+export function listComments(noticeId: number): Promise<NoticeComment[]> {
+  return request<NoticeComment[]>(`/notices/${noticeId}/comments`)
+}
+
+export function addComment(noticeId: number, body: string): Promise<NoticeComment> {
+  return request<NoticeComment>(`/notices/${noticeId}/comments`, { method: 'POST', json: { body } })
+}
+
+export async function deleteComment(noticeId: number, commentId: number): Promise<void> {
+  await request<null>(`/notices/${noticeId}/comments/${commentId}`, { method: 'DELETE' })
 }

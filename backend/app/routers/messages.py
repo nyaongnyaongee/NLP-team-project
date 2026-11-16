@@ -31,8 +31,9 @@ def _view(msg, user) -> dict:
     """보는 사람에 맞게 걸러서 돌려준다.
     - 교사가 보낸 글(skip): 양쪽 모두 있는 그대로
     - 학부모 글을 교사가 볼 때: 명시적으로 통과한 글은 원문, 그 외 완료된 글은 정제문. 분석은 둘 다 주되 인용문(quotes)은 뺌
-    - 학부모가 자기 글을 볼 때: 자기가 쓴 원문만 (정제문 · 분석은 교사용이라 뺌).
-      정제됐는지만 refined 로 알려 준다 (true = 교사에게 다듬어진 글로 감, 처리 전 · 실패 · 통과는 false)"""
+    - 학부모가 자기 글을 볼 때: 자기가 쓴 원문 + 정제됐는지(refined). 분석은 교사용이라 뺌.
+      refined = true(교사에게 다듬어진 글로 감)일 때만 정제문을 줘서 「정제됨」을 누르면 볼 수 있게 한다.
+      처리 전 · 실패 · 통과는 refined=false, 정제문 없음"""
     d = dict(msg)
     if d["status"] == "skip":
         return d
@@ -43,7 +44,8 @@ def _view(msg, user) -> dict:
             d["analysis"] = {k: v for k, v in d["analysis"].items() if k != "quotes"}
     else:
         d["refined"] = d["status"] == "done" and d.get("needs_refinement") is True
-        d["refined_text"] = None
+        if not d["refined"]:
+            d["refined_text"] = None
         d["analysis"] = None
     return d
 

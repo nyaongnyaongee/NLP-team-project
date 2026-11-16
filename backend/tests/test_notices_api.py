@@ -9,7 +9,7 @@ from app.routers import notices as notices_router
 def clean_notices(engine, ids):
     yield
     with engine.begin() as c:
-        c.execute(text("TRUNCATE notices RESTART IDENTITY"))
+        c.execute(text("TRUNCATE notice_comments, notices RESTART IDENTITY"))
 
 
 @pytest.fixture
@@ -136,3 +136,59 @@ def test_대화가_없어도_반_학생_학부모는_공지를_받는다(client,
 def test_빈_제목은_안_된다(client, auth):
     assert client.post("/notices", json={"title": "", "body": "b"}, headers=auth("teacher1")).status_code == 422
     assert client.post("/notices", json={"title": "a"}, headers=auth("teacher1")).status_code == 422
+
+
+# ---- 댓글
+
+def sent_notice(client, auth):
+    n = make(client, auth)
+    client.post(f"/notices/{n['id']}/send", headers=auth("teacher1"))
+    return n
+
+
+def comment(client, auth, who, nid, body):
+    return client.post(f"/notices/{nid}/comments", json={"body": body}, headers=auth(who))
+
+
+def test_교사와_학부모가_댓글을_달고_서로_본다(client, auth, ids, sent_to):
+    n = sent_notice(client, auth)
+    r = comment(client, auth, "parent1", n["id"], "  준비물 있나요?  ")
+    assert r.status_code == 201, r.text
+    assert r.json()["body"] == "준비물 있나요?" and r.json()["author_role"] == "parent" and r.json()["mine"]
+    assert comment(client, auth, "teacher1", n["id"], "물통만 챙겨 주세요").status_code == 201
+    assert sent_to[-1] == (sorted([ids["parent1"], ids["parent2"], ids["teacher1"]]), {"type": "notice", "notice_id": n["id"]})
+    for who in ("parent1", "parent2", "teacher1"):
+        got = client.get(f"/notices/{n['id']}/comments", headers=auth(who)).json()
+        assert [c["body"] for c in got] == ["준비물 있나요?", "물통만 챙겨 주세요"]
+        assert got[1]["author_name"].endswith("선생님") and got[0]["author_name"].endswith("학부모")
+    assert client.get("/notices", headers=auth("parent2")).json()[0]["comment_count"] == 2
+
+
+def test_초안과_받지_않은_공지에는_댓글을_못_단다(client, auth):
+    n = make(client, auth)
+    assert comment(client, auth, "teacher1", n["id"], "안녕").status_code == 409
+    assert comment(client, auth, "parent1", n["id"], "안녕").status_code == 404
+    sent = sent_notice(client, auth)
+    assert comment(client, auth, "team1", sent["id"], "안녕").status_code == 403
+    assert comment(client, auth, "parent1", sent["id"], "   ").status_code == 422
+
+
+def test_댓글은_쓴_사람과_공지를_쓴_교사만_지운다(client, auth, sent_to):
+    n = sent_notice(client, auth)
+    c = comment(client, auth, "parent1", n["id"], "질문").json()
+    url = f"/notices/{n['id']}/comments/{c['id']}"
+    other = client.get(f"/notices/{n['id']}/comments", headers=auth("parent2")).json()[0]
+    assert not other["mine"] and not other["can_delete"]
+    assert client.delete(url, headers=auth("parent2")).status_code == 403
+    assert client.delete(url, headers=auth("teacher1")).status_code == 204
+    c2 = comment(client, auth, "parent1", n["id"], "다시 질문").json()
+    assert client.delete(f"/notices/{n['id']}/comments/{c2['id']}", headers=auth("parent1")).status_code == 204
+    assert client.get(f"/notices/{n['id']}/comments", headers=auth("teacher1")).json() == []
+
+
+def test_공지를_지우면_댓글도_지워진다(client, auth, engine, sent_to):
+    n = sent_notice(client, auth)
+    comment(client, auth, "parent1", n["id"], "질문")
+    assert client.delete(f"/notices/{n['id']}", headers=auth("teacher1")).status_code == 204
+    with engine.connect() as c:
+        assert c.execute(text("SELECT count(*) FROM notice_comments")).scalar() == 0

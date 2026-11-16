@@ -25,3 +25,20 @@ class NoticeOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     sent_at: datetime | None
+    comment_count: int = 0
+
+
+class CommentIn(BaseModel):
+    body: str = Field(..., min_length=1, max_length=1000)
+
+
+class CommentOut(BaseModel):
+    id: int
+    notice_id: int
+    author_id: int
+    author_role: Literal["teacher", "parent"]
+    author_name: str  # 「김민지 선생님」 · 「박지민 학부모」
+    body: str
+    created_at: datetime
+    mine: bool  # 내가 쓴 댓글 (지우기 버튼)
+    can_delete: bool  # 내 댓글이거나, 내 공지에 달린 댓글(교사)

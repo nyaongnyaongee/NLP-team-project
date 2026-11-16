@@ -82,6 +82,15 @@ CREATE TABLE notices (
   sent_at    TIMESTAMPTZ
 );
 
+-- 공지 댓글: 보낸 공지에 교사 · 받는 학부모가 단다 (정제하지 않음)
+CREATE TABLE notice_comments (
+  id         BIGSERIAL PRIMARY KEY,
+  notice_id  BIGINT NOT NULL REFERENCES notices(id) ON DELETE CASCADE,  -- 공지를 지우면 댓글도
+  author_id  BIGINT NOT NULL REFERENCES users(id),
+  body       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 학생 메모장: 학생 한 명에 메모장 하나 (담임이 자유롭게 적는 글 한 덩어리). 학부모 · 민원대응팀 · Claude 에게는 주지 않는다
 CREATE TABLE student_memos (
   student_id BIGINT NOT NULL REFERENCES students(id),

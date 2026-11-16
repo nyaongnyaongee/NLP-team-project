@@ -5,6 +5,7 @@ import type { Notice } from '../../api/types'
 import { useNoticeSync } from '../../realtime/useNoticeSync'
 import { formatTime } from '../chat/formatTime'
 import { useResource } from '../chat/useResource'
+import NoticeComments from './NoticeComments'
 import NoticeView from './NoticeView'
 import { editedAfterSend } from './noticeEdited'
 
@@ -41,7 +42,13 @@ export default function ParentNotices() {
                     <span className="tag">학급 공지</span>
                     <h3>{n.title}</h3>
                     <p>{n.body}</p>
-                    {n.sent_at && <small>{formatTime(n.sent_at)}{editedAfterSend(n) && ' · 수정됨'}</small>}
+                    {n.sent_at && (
+                      <small>
+                        {formatTime(n.sent_at)}
+                        {editedAfterSend(n) && ' · 수정됨'}
+                        {(n.comment_count ?? 0) > 0 && ` · 댓글 ${n.comment_count}`}
+                      </small>
+                    )}
                   </Link>
                   <div className="notice-foot">
                     <Link className="notice-detail" to={`${BASE}/${n.id}`}>
@@ -68,7 +75,12 @@ function ParentNoticeDetail({ notices, loading }: { notices: Notice[]; loading: 
       <Link className="back" to={BASE}>
         ‹ 공지사항
       </Link>
-      {notice ? <NoticeView notice={notice} /> : <p className="alert" role="alert">찾을 수 없습니다</p>}
+      {notice ? (
+        <>
+          <NoticeView notice={notice} />
+          <NoticeComments noticeId={notice.id} />
+        </>
+      ) : <p className="alert" role="alert">찾을 수 없습니다</p>}
     </div>
   )
 }

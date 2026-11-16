@@ -69,6 +69,7 @@ export default function ParentConversationTab() {
       )}
       {deleteError && <p className="alert" role="alert">{deleteError}</p>}
       <ConversationList
+        showTeacher
         conversations={shown}
         onSelect={open}
         onDelete={(id) => {

@@ -221,3 +221,13 @@ def test_종료된_대화는_교사_목록에서만_지우고_DB_에는_남는�
     assert conv not in [c["id"] for c in client.get("/conversations", headers=auth("parent1")).json()]
     with engine.begin() as c:
         assert c.execute(text("SELECT parent_deleted_at FROM conversations WHERE id = :i"), {"i": conv}).scalar()
+
+
+def test_대화에_담임_학부모_이름이_같이_온다(client, auth, ids):
+    for who in ("parent1", "teacher1"):
+        convs = client.get("/conversations", headers=auth(who)).json()
+        assert convs and all(c["teacher_name"] and c["parent_name"] for c in convs)
+    one = client.get(f"/conversations/{ids['conv_parent1']}", headers=auth("parent1")).json()
+    assert one["teacher_name"] == client.get("/conversations", headers=auth("teacher1")).json()[0]["teacher_name"]
+    mine = client.get(f"/conversations/{ids['conv_parent1']}", headers=auth("teacher1")).json()
+    assert mine["parent_name"] == "박서연"

@@ -25,8 +25,11 @@ router = APIRouter(tags=["conversations"])
 HISTORY_LIMIT = 40  # 추출은 초안보다 길게 본다 (대화 전체에서 챙길 것을 찾으므로)
 
 
-def _conv_view(conv, user) -> dict:
+def _conv_view(conv, user, db: Session) -> dict:
     d = dict(conv)
+    # 대화 상대 이름: 학부모 화면 「김민지 선생님」, 교사 화면 「박서연 (박지민 부모)」
+    d.setdefault("teacher_name", crud.user_name(db, d["teacher_id"]))
+    d.setdefault("parent_name", crud.user_name(db, d["parent_id"]))  # 교사 화면 「박서연 (박지민 부모)」
     d.pop("teacher_deleted_at", None)  # 상대가 목록에서 지웠는지는 서로 모르게 (내가 지운 대화는 목록에 안 나옴)
     d.pop("parent_deleted_at", None)
     d.pop("teacher_read_id", None)  # 안 읽은 수는 목록의 unread 로 (내 것만)
@@ -111,7 +114,7 @@ def _preview(conv, msgs, user) -> dict:
 @router.get("/conversations")
 def my_conversations(db: Session = Depends(get_db), user=Depends(current_user)):
     convs = crud.list_conversations(db, user["id"])
-    return [{**_conv_view(c, user), "preview": _preview(c, crud.list_messages(db, c["id"]), user)} for c in convs]
+    return [{**_conv_view(c, user, db), "preview": _preview(c, crud.list_messages(db, c["id"]), user)} for c in convs]
 
 
 @router.get("/conversations/startable", response_model=list[StartableOut])
@@ -133,12 +136,12 @@ def start_conversation(body: ConversationStartIn, db: Session = Depends(get_db),
         raise HTTPException(404, "대화를 시작할 수 있는 학생이 아닙니다 (학부모가 등록되지 않았거나 내 학생이 아님)")
     conv = crud.create_conversation(db, row["teacher_id"], row["parent_id"], row["student_name"])
     hub.notify_conversation(conv["id"])  # 상대 화면의 대화 목록도 다시 불러오게
-    return _conv_view(conv, user)
+    return _conv_view(conv, user, db)
 
 
 @router.get("/conversations/{conv_id}")
 def one_conversation(conv_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
-    return _conv_view(messages_router._my_conversation(db, conv_id, user), user)
+    return _conv_view(messages_router._my_conversation(db, conv_id, user), user, db)
 
 
 @router.post("/conversations", status_code=201)
@@ -155,7 +158,7 @@ def create_conversation(body: ConversationIn, db: Session = Depends(get_db), use
             raise HTTPException(409, f"이미 열린 대화가 있습니다 (#{c['id']})")
     conv = crud.create_conversation(db, user["id"], body.parent_id, student)
     hub.notify_conversation(conv["id"])
-    return _conv_view(conv, user)
+    return _conv_view(conv, user, db)
 
 
 @router.post("/conversations/{conv_id}/close", status_code=202)
@@ -167,12 +170,12 @@ def close_conversation(conv_id: int, background: BackgroundTasks, body: Conversa
     conv = messages_router._my_conversation(db, conv_id, user)
     _need_owner_teacher(conv, user)
     if conv["status"] == "closed":
-        return _conv_view(conv, user)
+        return _conv_view(conv, user, db)
     conv = crud.set_conversation_status(db, conv_id, "closed", extract)
     hub.notify_conversation(conv_id)
     if extract:
         background.add_task(_extract_in_background, conv_id)
-    return _conv_view(conv, user)
+    return _conv_view(conv, user, db)
 
 
 @router.post("/conversations/{conv_id}/read", status_code=204)
@@ -201,8 +204,8 @@ def extract_again(conv_id: int, background: BackgroundTasks, db: Session = Depen
     if conv["status"] != "closed":
         raise HTTPException(409, "닫힌 대화에서만 뽑을 수 있습니다")
     if (conv["extract"] or {}).get("status") == "pending":
-        return _conv_view(conv, user)  # 이미 뽑는 중
+        return _conv_view(conv, user, db)  # 이미 뽑는 중
     conv = crud.set_conversation_status(db, conv_id, "closed")  # extract 를 pending 으로
     hub.notify_conversation(conv_id)
     background.add_task(_extract_in_background, conv_id)
-    return _conv_view(conv, user)
+    return _conv_view(conv, user, db)
