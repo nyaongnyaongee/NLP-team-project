@@ -3,6 +3,7 @@ import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-
 import { listNotices } from '../../api/notices'
 import type { Notice } from '../../api/types'
 import { useResource } from '../chat/useResource'
+import NoticeComments from './NoticeComments'
 import NoticeEditor from './NoticeEditor'
 import TeacherNoticeRow from './TeacherNoticeRow'
 
@@ -122,12 +123,15 @@ function NoticeDetail({
     )
   }
   return (
-    <NoticeEditor
-      key={notice.id}
-      notice={notice}
-      onSaved={onSaved}
-      onCancel={() => navigate(BASE)}
-      onConflict={onConflict}
-    />
+    <>
+      <NoticeEditor
+        key={notice.id}
+        notice={notice}
+        onSaved={onSaved}
+        onCancel={() => navigate(BASE)}
+        onConflict={onConflict}
+      />
+      {notice.status === 'sent' && <NoticeComments noticeId={notice.id} />}
+    </>
   )
 }

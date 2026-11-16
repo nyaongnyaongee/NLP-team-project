@@ -9,6 +9,8 @@ export type Conversation = {
   teacher_id: number
   parent_id: number
   student_name: string
+  teacher_name?: string | null // 담임 이름 (학부모 화면의 대화 상대 「김민지 선생님」)
+  parent_name?: string | null // 학부모 이름 (교사 화면의 대화 상대 「박서연 (박지민 부모)」)
   student_id?: number | null // 반 명단의 학생과 이어진 대화면 그 학생 번호 (학생 메모)
   status: 'open' | 'closed'
   extract?: { status: 'pending' | 'done' | 'failed'; error?: string; count?: number; at?: string } | null // 교사에게만 옴
@@ -43,10 +45,10 @@ export type Message = {
   id: number
   sender_id: number
   raw_text: string | null
-  refined_text: string | null // 교사에게만
+  refined_text: string | null // 교사: 정제문 / 학부모: refined 인 자기 글만
   analysis: Record<string, unknown> | null // 교사에게만, 모양 자유. 실패 시 { error: string }
   status: MessageStatus // 학부모 화면은 읽지 않는다 (중대 5)
-  refined?: boolean | null // 학부모에게만: 내 글이 다듬어져 선생님께 갔는지 (정제문은 안 옴)
+  refined?: boolean | null // 학부모에게만: 내 글이 다듬어져 선생님께 갔는지 (그때만 refined_text 가 옴)
   created_at: string
 }
 
@@ -76,6 +78,20 @@ export type Notice = {
   created_at: string
   updated_at: string
   sent_at: string | null
+  comment_count?: number // 댓글 수 (서버 schemas/notice.py)
+}
+
+// 공지 댓글 (게시된 공지에 교사 · 받는 학부모가 단다)
+export type NoticeComment = {
+  id: number
+  notice_id: number
+  author_id: number
+  author_role: 'teacher' | 'parent'
+  author_name: string // 「김민지 선생님」 · 「박지민 학부모」
+  body: string // 1~1000자
+  created_at: string
+  mine: boolean
+  can_delete: boolean // 내 댓글, 또는 내 공지에 달린 댓글(교사)
 }
 
 // 학부모 캘린더의 일정 (선생님이 공유한 것만, 서버 schemas/todo.py ParentEventOut)

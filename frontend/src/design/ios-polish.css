@@ -827,3 +827,58 @@ input.notice-input.student-search {
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* 교사 공지 카드 (TeacherNoticeRow): 상태 칩 · 한 줄 정보 · 알약 단추 */
+.nr-card { box-shadow: var(--ios-shadow); border-color: transparent; }
+.nr-card.is-draft { border: 1px dashed var(--ios-hairline); box-shadow: none; background: #fbfbfd; }
+.nr-card .notice-link { padding-bottom: 10px; }
+.nr-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 650; line-height: 1; padding: 5px 9px; border-radius: 999px;
+}
+.nr-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.nr-status.sent { color: #1f8a4c; background: rgba(52, 199, 89, 0.14); }
+.nr-status.draft { color: var(--secondary); background: var(--ios-fill); }
+.nr-meta { display: block; margin-top: 4px; font-size: 12px; color: var(--secondary); }
+.nr-actions {
+  display: flex; justify-content: flex-end; align-items: center; gap: 8px;
+  padding: 0 14px 14px;
+}
+.nr-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 34px; padding: 0 14px; border-radius: 999px; border: 0;
+  background: var(--ios-fill); color: var(--navy);
+  font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.nr-btn:hover { background: rgba(118, 118, 128, 0.2); }
+.nr-btn.danger { color: var(--ios-red); background: rgba(255, 59, 48, 0.08); }
+.nr-btn.danger:hover { background: rgba(255, 59, 48, 0.14); }
+.nr-btn.primary-pill { background: var(--primary); color: #fff; padding: 0 16px; }
+.nr-btn.primary-pill:hover { background: var(--primary-hover); }
+.nr-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* 대화 상대 이름이 길어도 시각 · 태그가 밀리지 않게: 이름은 줄이고(…) 시각 · 태그는 그대로 */
+.row-title { min-width: 0; }
+.row-title > small { flex-shrink: 0; white-space: nowrap; }
+.row-name { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.row-name b { flex-shrink: 0; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-name .tag, .row-name .unread { flex-shrink: 0; white-space: nowrap; }
+.row-sub {
+  flex-shrink: 1; min-width: 0;
+  font-size: 13px; font-weight: 500; color: var(--secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bar-sub {
+  display: block; margin-top: 1px;
+  font-size: 12px; font-weight: 500; color: var(--secondary); letter-spacing: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 안 읽은 수: 이름 옆이 아니라 아바타 오른쪽 위 모서리 (이름이 잘리지 않게) */
+.avatar-wrap { position: relative; flex-shrink: 0; display: inline-block; }
+.unread.on-avatar {
+  position: absolute; top: -6px; right: -7px;
+  min-width: 19px; height: 19px; padding: 0 5px; font-size: 11px;
+  border: 2px solid var(--white); box-sizing: content-box;
+}

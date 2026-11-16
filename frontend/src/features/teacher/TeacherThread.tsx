@@ -6,6 +6,7 @@ import { listTasks } from '../../api/tasks'
 import type { Conversation, Task } from '../../api/types'
 import { useConversationSync } from '../../realtime/useConversationSync'
 import { formatTime } from '../chat/formatTime'
+import { parentLabel } from '../chat/chatTitle'
 import MessageForm, { type MessageFormHandle } from '../chat/MessageForm'
 import { teacherView } from '../chat/messageText'
 import { useConversation } from '../chat/useConversation'
@@ -142,7 +143,10 @@ export default function TeacherThread({
           ‹
         </button>
         <span className="avatar">{conversation.student_name.slice(0, 1)}</span>
-        <b className="bar-title">{conversation.student_name}</b>
+        <b className="bar-title">
+          {parentLabel(conversation).name}
+          {parentLabel(conversation).sub && <small className="bar-sub">{parentLabel(conversation).sub}</small>}
+        </b>
         <span className="bar-actions">
           {conversation.student_id != null && (
             <MemoToggle open={memoOpen} onToggle={() => setMemoOpen((o) => !o)} />
@@ -215,7 +219,7 @@ export default function TeacherThread({
           return (
             <li key={m.id} className={`chat-message ${mine ? 'mine' : ''}`}>
               <div className="chat-name">
-                {mine ? '나' : '학부모'} <span>{formatTime(m.created_at)}</span>
+                {mine ? '나' : parentLabel(conversation).name} <span>{formatTime(m.created_at)}</span>
               </div>
               {view.kind === 'text' && <div className="chat-bubble">{view.text}</div>}
               {view.kind === 'pending' && (

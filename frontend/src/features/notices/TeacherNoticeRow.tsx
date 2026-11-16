@@ -59,26 +59,29 @@ export default function TeacherNoticeRow({
   }
 
   const to = `/teacher/notices/${notice.id}`
+  const comments = notice.comment_count ?? 0
+  const meta = sent
+    ? [notice.sent_at && `${formatTime(notice.sent_at)} 게시`, editedAfterSend(notice) && '수정됨', comments > 0 && `댓글 ${comments}`]
+    : [`${formatTime(notice.updated_at)} 저장`, '학부모에게 아직 안 보여요']
   return (
-    <article className="notice-card">
+    <article className={`notice-card nr-card ${sent ? 'is-sent' : 'is-draft'}`}>
       <Link className="notice-link" to={to}>
-        <span className="tag">{sent
-            ? `게시됨${notice.sent_at ? ` · ${formatTime(notice.sent_at)}` : ''}${editedAfterSend(notice) ? ' · 수정됨' : ''}`
-            : '초안'}</span>
+        <span className={`nr-status ${sent ? 'sent' : 'draft'}`}>{sent ? '게시됨' : '초안'}</span>
         <h3>{notice.title}</h3>
         <p>{notice.body}</p>
+        <small className="nr-meta">{meta.filter(Boolean).join(' · ')}</small>
       </Link>
       {error && <p className="alert" role="alert" style={{ margin: '0 16px 12px' }}>{error}</p>}
-      <div className="notice-foot">
-        <Link className="notice-detail" to={to}>
+      <div className="nr-actions">
+        <Link className="nr-btn" to={to}>
           수정
         </Link>
-        <button type="button" className="notice-detail" onClick={onDelete} disabled={busy}>
+        <button type="button" className="nr-btn danger" onClick={onDelete} disabled={busy}>
           삭제
         </button>
         {!sent && (
-          <button type="button" className="notice-chat" onClick={onSend} disabled={busy}>
-            게시
+          <button type="button" className="nr-btn primary-pill" onClick={onSend} disabled={busy}>
+            {busy ? '게시 중' : '게시하기'}
           </button>
         )}
       </div>

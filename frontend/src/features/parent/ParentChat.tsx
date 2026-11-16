@@ -3,6 +3,7 @@ import { deleteConversation } from '../../api/conversations'
 import { sendMessage } from '../../api/messages'
 import type { Conversation } from '../../api/types'
 import { useConversationSync } from '../../realtime/useConversationSync'
+import { teacherTitle } from '../chat/chatTitle'
 import { formatTime } from '../chat/formatTime'
 import MessageForm from '../chat/MessageForm'
 import { parentView } from '../chat/messageText'
@@ -10,8 +11,8 @@ import { useConversation } from '../chat/useConversation'
 import { useMarkRead } from '../chat/useMarkRead'
 import { useMessages } from '../chat/useMessages'
 
-// 학부모 대화방. 정제문과 정제 상태(메시지 status)는 읽지도 표시하지도 않는다 (중대 5).
-// 다만 내 글이 다듬어져 갔는지(refined)는 말풍선 아래에 작게 알린다.
+// 학부모 대화방. 정제 상태(메시지 status)는 읽지도 표시하지도 않는다 (중대 5).
+// 다만 내 글이 다듬어져 갔는지(refined)는 말풍선 아래에 「정제됨」으로 알리고, 누르면 선생님께 간 정제문을 펼친다.
 // 표시하는 "대화 상태"는 대화(conversation)의 열림/닫힘이며 메시지의 정제 상태와 무관하다.
 // onDeleted: 종료된 대화를 내 목록에서 지운 뒤 (목록에서 빼고 돌아간다)
 export default function ParentChat({
@@ -25,6 +26,14 @@ export default function ParentChat({
 }) {
   const [busy, setBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [openRefined, setOpenRefined] = useState<Set<number>>(() => new Set())
+  const toggleRefined = (id: number) =>
+    setOpenRefined((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   const { conversation, refresh: refreshConversation } = useConversation(initial)
   const { messages, loading, error, upsert, refresh: refreshMessages } = useMessages(initial.id)
   useMarkRead(initial.id, messages)
@@ -64,8 +73,8 @@ export default function ParentChat({
         <button type="button" className="bar-back" onClick={onBack} aria-label="대화 목록으로">
           ‹
         </button>
-        <span className="avatar">{conversation.student_name.slice(0, 1)}</span>
-        <b className="bar-title">{conversation.student_name}</b>
+        <span className="avatar">{teacherTitle(conversation).slice(0, 1)}</span>
+        <b className="bar-title">{teacherTitle(conversation)}</b>
         <span className="bar-actions">
           <span className="tag">{conversation.status === 'closed' ? '종료됨' : '대화 중'}</span>
         </span>
@@ -89,8 +98,20 @@ export default function ParentChat({
               </div>
               <div className="chat-bubble">{view.text}</div>
               {view.refined && (
-                <div className="refined-note" title="거친 표현을 다듬어 선생님께 전달했어요">
-                  정제됨
+                <button
+                  type="button"
+                  className="refined-note"
+                  title="거친 표현을 다듬어 선생님께 전달했어요"
+                  aria-expanded={openRefined.has(m.id)}
+                  onClick={() => toggleRefined(m.id)}
+                >
+                  정제됨 {openRefined.has(m.id) ? '▴' : '▾'}
+                </button>
+              )}
+              {view.refined && openRefined.has(m.id) && (
+                <div className="refined-text">
+                  <div className="refined-text-label">선생님께는 이렇게 전달됐어요</div>
+                  {view.refinedText ?? '정제문을 불러오지 못했어요'}
                 </div>
               )}
             </li>

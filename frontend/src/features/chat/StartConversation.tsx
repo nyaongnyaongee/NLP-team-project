@@ -59,11 +59,20 @@ export default function StartConversation({
         {data.map((s) => (
           <li key={s.student_id}>
             <button type="button" className="row" onClick={() => void start(s)} disabled={busyId !== null}>
-              <span className="avatar">{s.student_name.slice(0, 1)}</span>
+              <span className="avatar">{(role === 'teacher' ? s.parent_name : s.student_name).slice(0, 1)}</span>
               <span className="row-main">
                 <span className="row-title">
-                  <b>{s.student_name}</b>
-                  <small>{role === 'teacher' ? `학부모 ${s.parent_name}` : `담임 ${s.teacher_name} 선생님`}</small>
+                  {role === 'teacher' ? (
+                    <span className="row-name">
+                      <b>{s.parent_name}</b>
+                      <span className="row-sub">{s.student_name} 부모</span>
+                    </span>
+                  ) : (
+                    <>
+                      <b>{s.student_name}</b>
+                      <small>담임 {s.teacher_name} 선생님</small>
+                    </>
+                  )}
                 </span>
                 <span className="tag">
                   {busyId === s.student_id ? '여는 중…' : '새 대화 시작'}

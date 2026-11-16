@@ -13,6 +13,10 @@ def get_user(db: Session, user_id: int):
     return db.execute(text("SELECT * FROM users WHERE id = :i"), {"i": user_id}).mappings().first()
 
 
+def user_name(db: Session, user_id: int) -> str | None:
+    return db.execute(text("SELECT name FROM users WHERE id = :i"), {"i": user_id}).scalar()
+
+
 def get_conversation(db: Session, conv_id: int):
     return db.execute(text("SELECT * FROM conversations WHERE id = :i"), {"i": conv_id}).mappings().first()
 
@@ -318,6 +322,46 @@ def notice_recipients(db: Session, teacher_id: int) -> list[int]:
     ).all()]
 
 
+# ---- 공지 댓글
+
+def list_notice_comments(db: Session, notice_id: int):
+    """오래된 것부터. 쓴 사람 이름: 교사는 교사 이름, 학부모는 「(그 담임 반) 아이 이름 학부모」 (없으면 학부모 이름)."""
+    return db.execute(
+        text("SELECT c.id, c.notice_id, c.author_id, u.role AS author_role, c.body, c.created_at, "
+             "  CASE WHEN u.role = 'teacher' THEN u.name || ' 선생님' "
+             "       ELSE COALESCE((SELECT string_agg(s.name, ', ' ORDER BY s.name) FROM students s "
+             "                      WHERE s.parent_id = u.id AND s.teacher_id = n.teacher_id) || ' 학부모', "
+             "                     u.name || ' 학부모') END AS author_name "
+             "FROM notice_comments c JOIN users u ON u.id = c.author_id JOIN notices n ON n.id = c.notice_id "
+             "WHERE c.notice_id = :n ORDER BY c.created_at, c.id"),
+        {"n": notice_id},
+    ).mappings().all()
+
+
+def add_notice_comment(db: Session, notice_id: int, author_id: int, body: str) -> int:
+    cid = db.execute(text("INSERT INTO notice_comments (notice_id, author_id, body) VALUES (:n, :a, :b) RETURNING id"),
+                     {"n": notice_id, "a": author_id, "b": body}).scalar()
+    db.commit()
+    return cid
+
+
+def get_notice_comment(db: Session, comment_id: int):
+    return db.execute(text("SELECT * FROM notice_comments WHERE id = :i"), {"i": comment_id}).mappings().first()
+
+
+def delete_notice_comment(db: Session, comment_id: int) -> bool:
+    n = db.execute(text("DELETE FROM notice_comments WHERE id = :i"), {"i": comment_id}).rowcount
+    db.commit()
+    return n == 1
+
+
+def count_notice_comments(db: Session, notice_ids: list[int]) -> dict[int, int]:
+    if not notice_ids:
+        return {}
+    return dict(db.execute(text("SELECT notice_id, count(*) FROM notice_comments WHERE notice_id = ANY(:ids) "
+                                "GROUP BY notice_id"), {"ids": list(notice_ids)}).all())
+
+
 # ---- 신고 보고서 (D).  conversations.report = {"status": "pending" | "done" | "failed", "memo", …보고서 | "error", "at"}
 
 def set_report_pending(db: Session, conv_id: int, memo: str | None):
@@ -397,7 +441,7 @@ def save_memo(db: Session, student_id: int, teacher_id: int, body: str):
 
 def dev_reset(db: Session) -> list[int]:
     """메시지 · 할 일/일정 · 공지를 모두 지우고 대화를 처음 상태(열림, 추출 없음)로. 계정 · 대화 자체는 둔다. 대화 id 목록을 돌려준다."""
-    db.execute(text("TRUNCATE messages, tasks, notices RESTART IDENTITY"))
+    db.execute(text("TRUNCATE messages, tasks, notice_comments, notices RESTART IDENTITY"))
     db.execute(text("UPDATE conversations SET status = 'open', extract = NULL, report = NULL, reported_at = NULL, "
                     "teacher_deleted_at = NULL, parent_deleted_at = NULL, teacher_read_id = NULL, parent_read_id = NULL"))
     ids = [r[0] for r in db.execute(text("SELECT id FROM conversations ORDER BY id")).all()]

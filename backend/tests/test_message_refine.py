@@ -235,14 +235,15 @@ def test_교사가_받는_어떤_응답에도_원문이_없다(client, auth, ids
         assert c.execute(sql("SELECT raw_text FROM messages WHERE id = :i"), {"i": sent["id"]}).scalar() == RAW
 
 
-def test_학부모는_자기_원문만_보고_정제_결과는_못_본다(client, auth, ids, refine_with):
+def test_학부모는_자기_원문과_정제문을_보고_분석은_못_본다(client, auth, ids, refine_with):
     refine_with(lambda m: reply(good(m)))
     conv = ids["conv_parent1"]
     posted = send(client, auth, "parent1", conv, RAW).json()
     assert posted["raw_text"] == RAW and posted["refined_text"] is None and posted["analysis"] is None
     msg = read(client, auth, "parent1", conv)[0]
     assert msg["raw_text"] == RAW
-    assert msg["refined_text"] is None and msg["analysis"] is None  # 욕설로 분류됐는지 등은 학부모에게 안 보인다
+    assert msg["refined"] is True and msg["refined_text"]  # 「정제됨」을 누르면 볼 정제문
+    assert msg["analysis"] is None  # 욕설로 분류됐는지 등은 학부모에게 안 보인다
     assert msg["status"] == "done"
 
 
@@ -311,7 +312,7 @@ def test_정제가_실패하면_정제_여부는_비어_있다(client, auth, ids
         assert c.execute(text("SELECT status, needs_refinement FROM messages")).one() == ("failed", None)
 
 
-def test_학부모는_자기_글이_정제됐는지만_안다(client, auth, ids, engine):
+def test_학부모는_자기_글이_정제됐을_때만_정제문을_본다(client, auth, ids, engine):
     conv = ids["conv_parent1"]
     with engine.begin() as c:
         for raw, refined, needs, st in (("거친 글", "다듬은 글", True, "done"), ("고운 글", None, False, "done"),
@@ -321,6 +322,7 @@ def test_학부모는_자기_글이_정제됐는지만_안다(client, auth, ids,
                       {"c": conv, "s": ids["parent1"], "r": raw, "f": refined, "n": needs, "st": st})
     mine = client.get(f"/conversations/{conv}/messages", headers=auth("parent1")).json()[-3:]
     assert [(m["raw_text"], m["refined"], m["refined_text"]) for m in mine] == [
-        ("거친 글", True, None), ("고운 글", False, None), ("처리 전", False, None)]
+        ("거친 글", True, "다듬은 글"), ("고운 글", False, None), ("처리 전", False, None)]
     teacher = client.get(f"/conversations/{conv}/messages", headers=auth("teacher1")).json()
     assert all(m["refined"] is None for m in teacher)  # 교사에게는 여전히 안 줌
+    assert all(m["analysis"] is None for m in mine)  # 분석은 학부모에게 안 줌
