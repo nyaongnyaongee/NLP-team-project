@@ -52,3 +52,17 @@ export const StudentIcon = () => (
     <path d="M16 4.8a3.3 3.3 0 0 1 0 6.4M18.5 14.8c1.7.7 2.7 2.4 3 5.2" />
   </Icon>
 )
+
+export const PenIcon = () => (
+  <Icon>
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+    <path d="m14.5 5.5 3 3" />
+  </Icon>
+)
+
+export const RefreshIcon = () => (
+  <Icon>
+    <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+    <path d="M20 4v5h-5" />
+  </Icon>
+)
