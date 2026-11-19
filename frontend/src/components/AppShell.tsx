@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import logo from '../design/ieum-logo.png'
 import { useRealtimeHub } from '../realtime/RealtimeContext'
 import AccountBar from './AccountBar'
 import { RefreshIcon } from './icons'
+import { useScrollRestoration } from './useScrollRestoration'
 
 // 데모(app-sage.html)에 적힌 학교 이름. 서버에 학교 정보가 없어 데모 문구를 그대로 쓴다 (B1 참고).
 export const SCHOOL_NAME = '숭실초등학교'
@@ -37,6 +38,8 @@ export default function AppShell({
   children: ReactNode
 }) {
   const { session } = useAuth()
+  const contentRef = useRef<HTMLElement>(null)
+  useScrollRestoration(contentRef) // 하위 화면에서 돌아오면 이전 스크롤 위치로, 그 밖의 이동은 맨 위에서 시작
   return (
     <div className="stage">
       <div className="phone-shell">
@@ -61,7 +64,7 @@ export default function AppShell({
               </div>
             )}
           </header>
-          <main className="content">
+          <main className="content" ref={contentRef}>
             <h1 className="sr-only">{title}</h1>
             {children}
           </main>

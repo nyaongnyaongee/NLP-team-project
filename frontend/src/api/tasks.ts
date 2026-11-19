@@ -31,6 +31,11 @@ export function createEvent(body: { title: string; due_at: string | null; shared
   return request<Task>('/events', { method: 'POST', json: body })
 }
 
+// 교사가 직접 등록하는 할 일 (201). 기한(due_at)은 비워 둘 수 있다.
+export function createTodo(body: { title: string; due_at: string | null }): Promise<Task> {
+  return request<Task>('/todos', { method: 'POST', json: body })
+}
+
 // 학부모: 선생님이 공유한 일정 (같은 /events 지만 학부모에게는 이 모양으로 온다)
 export function listParentEvents(): Promise<ParentEvent[]> {
   return request<ParentEvent[]>('/events')

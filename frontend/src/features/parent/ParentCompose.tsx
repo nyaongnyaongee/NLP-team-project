@@ -59,7 +59,7 @@ export default function ParentCompose() {
       const conv = await startConversation(picked.student_id)
       await sendMessage(conv.id, body)
       setText('')
-      navigate('/parent/chats', { state: { open: conv.id } })
+      navigate(`/parent/chats?chat=${conv.id}`)
     } catch (e) {
       setSendError(e instanceof Error ? e.message : '보내지 못했습니다')
       setBusy(false)

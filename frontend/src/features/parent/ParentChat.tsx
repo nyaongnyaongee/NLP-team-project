@@ -6,8 +6,10 @@ import { useConversationSync } from '../../realtime/useConversationSync'
 import { teacherTitle } from '../chat/chatTitle'
 import { formatTime } from '../chat/formatTime'
 import MessageForm from '../chat/MessageForm'
+import NewMessageButton from '../chat/NewMessageButton'
 import { parentView } from '../chat/messageText'
 import { useConversation } from '../chat/useConversation'
+import { useChatScroll } from '../chat/useChatScroll'
 import { useMarkRead } from '../chat/useMarkRead'
 import { useMessages } from '../chat/useMessages'
 
@@ -46,6 +48,8 @@ export default function ParentChat({
     void refreshConversation()
   }, [refreshMessages, refreshConversation])
   useConversationSync(initial.id, refreshAll)
+  // 대화를 열면 맨 아래로, 새 글이 오면 아래를 보는 중일 때만 따라가고 위를 보는 중이면 「새 메시지」 버튼
+  const { logRef, showNew, scrollToBottom } = useChatScroll(messages, (m) => m.sender_id !== conversation.teacher_id)
 
   // 종료된 대화에는 보낼 수 없다 (서버도 409). 입력창 대신 안내를 보인다.
   async function onSend(text: string) {
@@ -121,7 +125,7 @@ export default function ParentChat({
           <div className="big">▤</div>아직 메시지가 없어요
         </div>
       )}
-      <ul className="chat-log">
+      <ul className="chat-log" ref={logRef}>
         {messages.map((m) => {
           // 교사 글이 아니면 학부모(나)의 글이다 (중대 4)
           const mine = m.sender_id !== conversation.teacher_id
@@ -165,6 +169,7 @@ export default function ParentChat({
         </>
       ) : (
         <div className="chat-compose">
+          <NewMessageButton visible={showNew} onClick={() => scrollToBottom()} />
           <MessageForm id="parent-message" label="선생님께 메시지 쓰기" onSend={onSend} />
         </div>
       )}

@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { listConversations, startConversation } from '../../api/conversations'
 import type { Conversation } from '../../api/types'
 import { listStudents, type Student } from '../../api/students'
 import ConversationList from '../chat/ConversationList'
+import SortSelect, { type SortControl } from '../chat/SortSelect'
 import StatusFilter from '../chat/StatusFilter'
+import { sortConversations } from '../chat/sortConversations'
+import { usePersistedSort } from '../chat/usePersistedSort'
 import { useStatusFilter } from '../chat/useStatusFilter'
 import { useConversations } from '../chat/useConversations'
 import { useResource } from '../chat/useResource'
@@ -31,6 +34,16 @@ export default function StudentsTab() {
 
 type Conversations = ReturnType<typeof useConversations>['conversations']
 
+// 학생 정렬: 이름 순 (가나다, 처음은 오름차순) · 진행 중 대화 순 (처음은 진행 중 대화가 많은 학생이 위, 같으면 이름 순). 방향은 항목을 한 번 더 눌러 바꾼다
+type StudentSortKey = 'name' | 'open'
+const STUDENT_SORTS: readonly StudentSortKey[] = ['name', 'open']
+const STUDENT_SORT_OPTIONS = [
+  { value: 'name', label: '이름 순' },
+  { value: 'open', label: '진행 중 대화 순' },
+]
+const studentDefaultDesc = (key: StudentSortKey) => key !== 'name'
+const byName = (a: Student, b: Student) => a.name.localeCompare(b.name, 'ko') || a.id - b.id
+
 function StudentList({
   students,
   loading,
@@ -44,10 +57,29 @@ function StudentList({
 }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const [sort, setSort] = usePersistedSort<StudentSortKey>('ieum:sort:v2:students', STUDENT_SORTS, 'name', studentDefaultDesc)
+  const openCounts = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const c of conversations) {
+      if (c.status === 'open' && c.student_id != null) m.set(c.student_id, (m.get(c.student_id) ?? 0) + 1)
+    }
+    return m
+  }, [conversations])
   const shown = useMemo(() => {
     const q = query.trim()
-    return q ? students.filter((s) => s.name.includes(q)) : students
-  }, [students, query])
+    const list = q ? students.filter((s) => s.name.includes(q)) : [...students]
+    const sign = sort.desc ? -1 : 1
+    if (sort.key === 'open') {
+      return list.sort((a, b) => sign * ((openCounts.get(a.id) ?? 0) - (openCounts.get(b.id) ?? 0) || byName(a, b)))
+    }
+    return list.sort((a, b) => sign * byName(a, b))
+  }, [students, query, sort, openCounts])
+  const sortControl: SortControl = {
+    options: STUDENT_SORT_OPTIONS,
+    value: sort.key,
+    desc: sort.desc,
+    onPick: (value) => setSort(value === 'open' ? 'open' : 'name'),
+  }
 
   return (
     <section>
@@ -57,6 +89,7 @@ function StudentList({
         <span className="muted">{students.length}명</span>
       </div>
       <InviteCard />
+      <div className="search-row">
       <input
         className="notice-input student-search"
         type="search"
@@ -65,6 +98,8 @@ function StudentList({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
+      <SortSelect control={sortControl} />
+      </div>
       {loading && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}
       {!loading && !error && shown.length === 0 && <div className="empty">{query ? '찾는 학생이 없어요' : '반 학생이 없어요'}</div>}
@@ -84,7 +119,7 @@ function StudentList({
                     </span>
                   </span>
                   <span className="row-last">
-                    {s.parent_name ? `${s.parent_name} 학부모` : '학부모 미연결'}
+                    {s.parent_name ? `학부모 ${s.parent_name}` : '학부모 미연결'}
                     {' · '}
                     {mine.length === 0 ? '대화 없음' : `대화 ${mine.length}개${open ? ` · 진행 중 ${open}` : ''}`}
                   </span>
@@ -108,20 +143,22 @@ function StudentDetail({ students, conversations }: { students: Student[]; conve
   const [error, setError] = useState<string | null>(null)
   const student = students.find((s) => String(s.id) === id)
   const mine = conversations.filter((c) => student && c.student_id === student.id)
-  const { show, setShow, shown, openCount, closedCount } = useStatusFilter(mine) // 대화 중 / 종료된 대화
-  const [viewingDeleted, setViewingDeleted] = useState<Conversation | null>(null) // 「삭제한 대화」에서 연 대화 (읽기 전용)
+  const { show, setShow, shown, openCount, closedCount, sortControl } = useStatusFilter(mine) // 대화 중 / 종료된 대화
+  // 「삭제한 대화」에서 연 대화 (읽기 전용). 브라우저 뒤로 가기로 학생 화면에 돌아오도록 기록(history state)에 둔다
+  const location = useLocation()
+  const viewingDeleted = (location.state as { viewDeleted?: Conversation } | null)?.viewDeleted ?? null
   if (viewingDeleted) {
     return (
       <TeacherThread
         key={viewingDeleted.id}
         conversation={viewingDeleted}
         deleted
-        onBack={() => setViewingDeleted(null)}
+        onBack={() => navigate(-1)}
         onLeave={(message) => {
-          setViewingDeleted(null)
+          navigate(-1)
           setError(message)
         }}
-        onDeleted={() => setViewingDeleted(null)}
+        onDeleted={() => navigate(-1)}
       />
     )
   }
@@ -135,7 +172,7 @@ function StudentDetail({ students, conversations }: { students: Student[]; conve
       </section>
     )
   }
-  const openChat = (conversationId: number) => navigate('/teacher', { state: { open: conversationId } })
+  const openChat = (conversationId: number) => navigate(`/teacher?chat=${conversationId}`)
 
   const start = async () => {
     setBusy(true)
@@ -181,12 +218,12 @@ function StudentDetail({ students, conversations }: { students: Student[]; conve
           아직 연결된 학부모가 없어요. 학부모가 반 초대 코드와 「{student.name}」 이름으로 들어오면 대화할 수 있어요.
         </p>
       )}
-      {mine.length === 0 && student.parent_name && <div className="empty">{student.parent_name} 학부모와 나눈 대화가 없어요</div>}
+      {mine.length === 0 && student.parent_name && <div className="empty">학부모와 나눈 대화가 없어요</div>}
       {mine.length > 0 && (
-        <StatusFilter show={show} setShow={setShow} openCount={openCount} closedCount={closedCount} shownCount={shown.length} />
+        <StatusFilter show={show} setShow={setShow} openCount={openCount} closedCount={closedCount} shownCount={shown.length} sort={sortControl} />
       )}
       <ConversationList conversations={shown} onSelect={openChat} />
-      <DeletedConversations key={student.id} studentId={student.id} onOpen={setViewingDeleted} />
+      <DeletedConversations key={student.id} studentId={student.id} onOpen={(c) => navigate('.', { state: { viewDeleted: c } })} />
     </section>
   )
 }
@@ -227,7 +264,7 @@ function DeletedConversations({ studentId, onOpen }: { studentId: number; onOpen
           {rows !== null && rows.length === 0 && <div className="empty">삭제한 대화가 없어요</div>}
           {rows !== null && rows.length > 0 && (
             <ConversationList
-              conversations={rows}
+              conversations={sortConversations(rows)}
               onSelect={(cid) => {
                 const c = rows.find((r) => r.id === cid)
                 if (c) onOpen(c)

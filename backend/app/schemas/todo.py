@@ -33,6 +33,12 @@ class EventIn(BaseModel):
     shared: bool = True
 
 
+class TodoIn(BaseModel):
+    """교사가 직접 등록하는 할 일."""
+    title: str = Field(min_length=1, max_length=100)
+    due_at: datetime | None = None
+
+
 class ParentEventOut(BaseModel):
     """학부모 캘린더의 일정 (공유된 것만)."""
     id: int

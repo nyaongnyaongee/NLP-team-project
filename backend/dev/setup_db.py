@@ -59,6 +59,7 @@ UPGRADES = [
     "ALTER TABLE tasks ALTER COLUMN conversation_id DROP NOT NULL",                             # 반 전체 일정은 대화 없음
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS teacher_read_id BIGINT",                # 안 읽은 메시지 수
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS parent_read_id BIGINT",
+    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ",                  # 대화를 닫은 시각 (종료 순 정렬)
     # 공지 테이블 (schema.sql 의 것과 같게)
     """CREATE TABLE IF NOT EXISTS notices (
       id         BIGSERIAL PRIMARY KEY,

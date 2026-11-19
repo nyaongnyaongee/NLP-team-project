@@ -18,7 +18,7 @@ def clean(engine, ids):
         c.execute(text("TRUNCATE messages, tasks RESTART IDENTITY"))
         c.execute(text("DELETE FROM conversations WHERE id NOT IN (:a, :b)"),
                   {"a": ids["conv_parent1"], "b": ids["conv_parent2"]})
-        c.execute(text("UPDATE conversations SET status = 'open', extract = NULL, teacher_deleted_at = NULL, parent_deleted_at = NULL"))
+        c.execute(text("UPDATE conversations SET status = 'open', extract = NULL, closed_at = NULL, teacher_deleted_at = NULL, parent_deleted_at = NULL"))
 
 
 @pytest.fixture
@@ -251,3 +251,15 @@ def test_지운_대화는_따로_다시_볼_수_있다(client, auth, ids, engine
     assert conv not in [c["id"] for c in client.get("/conversations?deleted=true", headers=auth("parent1")).json()]
     with engine.begin() as c:
         c.execute(text("DELETE FROM conversations WHERE id = :i"), {"i": conv})
+
+
+def test_닫으면_종료_시각이_남고_다시_뽑아도_그대로(client, auth, ids, extractor):
+    conv = ids["conv_parent1"]
+    extractor(DONE)
+    assert client.get(f"/conversations/{conv}", headers=auth("teacher1")).json()["closed_at"] is None
+    first = client.post(f"/conversations/{conv}/close", headers=auth("teacher1"), json={"extract": False}).json()["closed_at"]
+    assert first is not None
+    assert client.post(f"/conversations/{conv}/extract", headers=auth("teacher1")).status_code == 202  # 다시 뽑기
+    assert client.get(f"/conversations/{conv}", headers=auth("teacher1")).json()["closed_at"] == first
+    listed = {c["id"]: c for c in client.get("/conversations", headers=auth("teacher1")).json()}
+    assert listed[conv]["closed_at"] == first and listed[ids["conv_parent2"]]["closed_at"] is None

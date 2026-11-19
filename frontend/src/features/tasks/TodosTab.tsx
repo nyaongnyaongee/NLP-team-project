@@ -1,9 +1,13 @@
+import { useState } from 'react'
+import { createTodo } from '../../api/tasks'
+import ManualTaskForm from './ManualTaskForm'
 import TaskItem from './TaskItem'
 import { useTaskList } from './useTaskList'
 
-// 교사 "할 일" 탭: 추가된 할 일 목록, 체크(done), 수정, 삭제, 미완료 개수
+// 교사 "할 일" 탭: 추가된 할 일 목록, 체크(done), 수정, 삭제, 미완료 개수, 「＋ 할 일 추가」로 직접 등록
 export default function TodosTab() {
-  const { tasks, loading, error, replace, remove } = useTaskList('todo')
+  const { tasks, loading, error, replace, remove, add } = useTaskList('todo')
+  const [adding, setAdding] = useState(false)
   const remaining = tasks.filter((t) => t.status === 'added').length
 
   return (
@@ -15,7 +19,23 @@ export default function TodosTab() {
           <br />
           하나씩 체크하세요.
         </h2>
+        {!adding && (
+          <button type="button" className="manual-add" onClick={() => setAdding(true)}>
+            ＋ 할 일 추가
+          </button>
+        )}
       </div>
+      {adding && (
+        <ManualTaskForm
+          kind="todo"
+          onSubmit={(input) => createTodo({ title: input.title, due_at: input.due_at })}
+          onCancel={() => setAdding(false)}
+          onAdded={(t) => {
+            add(t)
+            setAdding(false)
+          }}
+        />
+      )}
       {!loading && !error && <p className="sub">미완료 {remaining}개</p>}
       {loading && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}

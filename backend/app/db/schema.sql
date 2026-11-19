@@ -35,6 +35,7 @@ CREATE TABLE conversations (
   teacher_read_id    BIGINT,                -- 담임이 마지막으로 읽은 메시지 번호 (안 읽은 수 = 상대 글 중 이보다 큰 것). NULL = 안 읽음
   parent_read_id     BIGINT,                -- 학부모 쪽, 위와 같음           -- 학부모가 목록에서 지운 시각. 위와 같음 (교사 목록 · 보고서에는 그대로)
   extract      JSONB,                       -- 할 일 · 일정 추출(C) 상태: {"status": "pending|done|failed", "error", "count", "at"}. NULL = 닫은 적 없음
+  closed_at    TIMESTAMPTZ,                 -- 대화를 닫은 시각 (종료 순 정렬). 열린 대화 · 이 열이 생기기 전에 닫은 대화는 NULL
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

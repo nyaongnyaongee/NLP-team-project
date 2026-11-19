@@ -8,11 +8,14 @@ import { useConversationSync } from '../../realtime/useConversationSync'
 import { formatTime } from '../chat/formatTime'
 import { parentLabel } from '../chat/chatTitle'
 import MessageForm, { type MessageFormHandle } from '../chat/MessageForm'
+import NewMessageButton from '../chat/NewMessageButton'
 import { teacherView } from '../chat/messageText'
 import { useConversation } from '../chat/useConversation'
+import { useChatScroll } from '../chat/useChatScroll'
 import { useMarkRead } from '../chat/useMarkRead'
 import { useMessages } from '../chat/useMessages'
 import { useResource } from '../chat/useResource'
+import { revealElement, revealRef } from '../chat/useReveal'
 import CandidatePanel from '../tasks/CandidatePanel'
 import ReplyDraftPanel, { DraftToggle } from './ReplyDraftPanel'
 import { MemoPanel, MemoToggle } from './StudentMemo'
@@ -42,6 +45,8 @@ export default function TeacherThread({
   useMarkRead(initial.id, messages)
 
   const closed = conversation.status === 'closed'
+  // 대화를 열면 맨 아래로, 새 글이 오면 아래를 보는 중일 때만 따라가고 위를 보는 중이면 「새 메시지」 버튼
+  const { logRef, showNew, scrollToBottom } = useChatScroll(messages, (m) => m.sender_id === conversation.teacher_id)
 
   // 후보는 종료된 대화에서만 읽는다 (열린 대화에는 후보가 없으므로 요청을 아낀다).
   // 추출이 끝나면 서버가 알림을 보내 refreshAll 이 불리고, 그때 최신 closed 값으로 읽는다.
@@ -102,10 +107,24 @@ export default function TeacherThread({
   const onClose = (extract: boolean) => {
     setClosing(false)
     void run(async () => {
-      setConversation(await closeConversation(conversation.id, extract))
+      const closedConversation = await closeConversation(conversation.id, extract)
+      justClosedRef.current = extract // 뽑으며 닫았으면 추출 결과가 보이는 곳으로 화면을 옮긴다 (아래 effect)
+      setConversation(closedConversation)
       refreshAll()
     })
   }
+
+  // 방금 닫은 대화: 추출 중 · 실패는 상태 줄로, 끝나면 후보 영역으로 스크롤한다 (이미 보이면 움직이지 않는다)
+  const justClosedRef = useRef(false)
+  const statusBoxRef = useRef<HTMLDivElement>(null)
+  const candidateBoxRef = useRef<HTMLDivElement>(null)
+  const extractStatus = closed ? (conversation.extract?.status ?? null) : null
+  useEffect(() => {
+    if (!justClosedRef.current || extractStatus === null) return
+    if (extractStatus === 'done') revealElement(candidateBoxRef.current)
+    else revealElement(statusBoxRef.current)
+    if (extractStatus !== 'pending') justClosedRef.current = false
+  }, [extractStatus])
 
   const onDelete = () => {
     if (!window.confirm('이 대화를 목록에서 삭제할까요?')) return
@@ -163,7 +182,7 @@ export default function TeacherThread({
         </span>
       </div>
       {!closed && closing && (
-        <div className="close-choice" role="group" aria-label="대화 종료 방법">
+        <div className="close-choice" role="group" aria-label="대화 종료 방법" ref={revealRef}>
           <p className="info">대화를 종료할까요? 할 일·일정 후보는 종료한 뒤에도 뽑을 수 있습니다.</p>
           <button type="button" className="primary" onClick={() => onClose(true)} disabled={busy}>
             종료하고 할 일·일정 뽑기
@@ -184,7 +203,7 @@ export default function TeacherThread({
         </button>
       )}
       {closed && extract && (
-        <div>
+        <div ref={statusBoxRef}>
           {extract.status === 'pending' && (
             <p className="info">
               <span className="spinner blue" />
@@ -204,7 +223,7 @@ export default function TeacherThread({
           )}
         </div>
       )}
-      {actionError && <p className="alert" role="alert">{actionError}</p>}
+      {actionError && <p className="alert" role="alert" ref={revealRef}>{actionError}</p>}
       {loading && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}
       {!loading && !error && messages.length === 0 && (
@@ -213,7 +232,7 @@ export default function TeacherThread({
         </div>
       )}
 
-      <ul className="chat-log">
+      <ul className="chat-log" ref={logRef}>
         {messages.map((m) => {
           // sender_id 가 대화의 teacher_id 와 같으면 교사 글(내 글) (중대 4)
           const mine = m.sender_id === conversation.teacher_id
@@ -253,13 +272,15 @@ export default function TeacherThread({
       {closed ? (
         <>
           <div className="closed-note">{deleted ? '종료하고 목록에서 삭제한 대화입니다.' : '이 대화는 종료되었습니다.'}</div>
-          <CandidatePanel
-            candidates={candidates}
-            loading={!candidatesLoaded && candidatesError === null}
-            error={candidatesError}
-            onUpdated={(t) => setCandidates((prev) => prev.map((p) => (p.id === t.id ? t : p)))}
-            onRemoved={(id) => setCandidates((prev) => prev.filter((p) => p.id !== id))}
-          />
+          <div ref={candidateBoxRef}>
+            <CandidatePanel
+              candidates={candidates}
+              loading={!candidatesLoaded && candidatesError === null}
+              error={candidatesError}
+              onUpdated={(t) => setCandidates((prev) => prev.map((p) => (p.id === t.id ? t : p)))}
+              onRemoved={(id) => setCandidates((prev) => prev.filter((p) => p.id !== id))}
+            />
+          </div>
           {!deleted && (
             <button type="button" className="delete-item" onClick={onDelete} disabled={busy}>
               대화 삭제
@@ -271,6 +292,7 @@ export default function TeacherThread({
           {/* 초안은 입력창에 채워질 뿐 자동으로 보내지 않는다. 보내면 패널을 새로 만들어 이전 초안의 확인 항목을 지운다 (S7) */}
           {/* 입력창은 화면 아래에 붙어 있다 (메시지가 길어도 스크롤해도 보임) */}
           <div className="chat-compose">
+            <NewMessageButton visible={showNew} onClick={() => scrollToBottom()} />
             <MessageForm
               id="teacher-reply"
               label="답장 쓰기"

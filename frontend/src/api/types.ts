@@ -15,6 +15,7 @@ export type Conversation = {
   status: 'open' | 'closed'
   extract?: { status: 'pending' | 'done' | 'failed'; error?: string; count?: number; at?: string } | null // 교사에게만 옴
   created_at: string
+  closed_at?: string | null // 대화를 닫은 시각 (종료 순 정렬). 열린 대화 · 예전에 닫은 대화는 null
   last_message_at?: string | null // 목록에서만 옴. 마지막 메시지 시각 (없으면 null)
   preview?: ConversationPreview // 목록에서만 옴
   unread?: number // 목록에서만 옴. 상대가 보낸 글 중 내가 아직 안 읽은 수

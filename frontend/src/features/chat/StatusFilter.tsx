@@ -1,23 +1,25 @@
+import SortSelect, { type SortControl } from './SortSelect'
 import type { ConversationStatus } from './useStatusFilter'
 
-// 「대화 중」 / 「종료된 대화」 버튼 (교사·학부모 공용)
+// 「진행 중」 / 「종료」 탭 버튼 (교사·학부모 공용)
 export default function StatusFilter({
   show,
   setShow,
   openCount,
   closedCount,
   shownCount,
-  openHint,
+  sort,
 }: {
   show: ConversationStatus
   setShow: (s: ConversationStatus) => void
   openCount: number
   closedCount: number
   shownCount: number
-  openHint?: string // 「대화 중」 목록 위 안내 (교사: 밀어서 종료)
+  sort?: SortControl // 정렬 셀렉트 (useStatusFilter 의 sortControl)
 }) {
   return (
     <>
+      <div className="filter-row">
       <div className="chips" role="group" aria-label="대화 상태">
         <button
           type="button"
@@ -25,7 +27,7 @@ export default function StatusFilter({
           aria-pressed={show === 'open'}
           onClick={() => setShow('open')}
         >
-          대화 중 {openCount}
+          진행 중 {openCount}
         </button>
         <button
           type="button"
@@ -33,11 +35,11 @@ export default function StatusFilter({
           aria-pressed={show === 'closed'}
           onClick={() => setShow('closed')}
         >
-          종료된 대화 {closedCount}
+          종료 {closedCount}
         </button>
       </div>
-      {show === 'open' && shownCount > 0 && openHint && <p className="info">{openHint}</p>}
-      {show === 'closed' && shownCount > 0 && <p className="info">왼쪽으로 밀면 내 목록에서 삭제할 수 있어요.</p>}
+      {sort && <SortSelect control={sort} />}
+      </div>
       {shownCount === 0 && (
         <p className="info">{show === 'open' ? '진행 중인 대화가 없습니다.' : '종료된 대화가 없습니다.'}</p>
       )}
