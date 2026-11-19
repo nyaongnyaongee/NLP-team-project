@@ -223,7 +223,7 @@ Step '8. 완료'
 $url = [regex]::Match($final, 'https://[A-Za-z0-9.\-]+\.ts\.net').Value
 if ($url) { Write-Host "폰에서 열 주소: $url" -ForegroundColor Green } else { Warn '주소를 상태 출력에서 찾지 못했습니다. 위 tailscale serve status 를 보세요.' }
 if ($Funnel) {
-    Write-Host '폰에 Tailscale 이 없어도 접속됩니다. QR: PC 의 Edge/Chrome 으로 위 주소를 열고 주소창의 공유(또는 QR) 아이콘 → QR 코드.'
+    Write-Host '폰에 Tailscale 이 없어도 접속됩니다. QR: PC 에서 위 주소로 teacher1 로그인 → 「학생」 탭 → [QR 보기] (학부모 초대 화면 /join, 코드 EUM2026).'
     Warn '켠 직후 몇 분은 일부 폰에서 「보안 연결을 할 수 없음」이 날 수 있습니다. 시연 10분 전에 켜고 폰으로 한 번 확인하세요.'
     Warn '인터넷 누구나 접속 가능: 시드 계정 비밀번호가 고정값이니 진짜 내용은 넣지 말고, 끝나면 반드시 -Stop.'
 } else {

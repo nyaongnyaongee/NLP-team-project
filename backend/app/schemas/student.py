@@ -18,3 +18,18 @@ class MemoOut(BaseModel):
     student_id: int
     body: str
     updated_at: datetime | None  # 한 번도 안 적었으면 null
+
+
+class InviteOut(BaseModel):
+    code: str  # 교사의 반 초대 코드
+
+
+class ChildIn(BaseModel):
+    """학부모가 자녀 더하기: 그 반 담임의 초대 코드 + 자녀 이름"""
+    invite_code: str = Field(..., max_length=40)
+    student_name: str = Field(..., max_length=40)
+
+
+class JoinIn(ChildIn):
+    """가입 없이 들어오기 (시연): 초대 코드 + 자녀 이름 + 보호자 이름"""
+    parent_name: str = Field(..., max_length=40)

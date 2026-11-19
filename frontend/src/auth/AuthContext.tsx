@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { login as loginApi } from '../api/auth'
+import { joinWithCode, login as loginApi } from '../api/auth'
 import { setUnauthorizedHandler } from '../api/client'
 import { clearSession, loadSession, saveSession, type Session } from './authStorage'
 
 type AuthValue = {
   session: Session | null
   login: (loginId: string, password: string) => Promise<void>
+  join: (inviteCode: string, studentName: string, parentName: string) => Promise<void>
   logout: () => void
 }
 
@@ -34,13 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(next)
   }, [])
 
+  const join = useCallback(async (inviteCode: string, studentName: string, parentName: string) => {
+    const res = await joinWithCode(inviteCode, studentName, parentName)
+    const next: Session = { token: res.token, name: res.name, role: res.role, guest: true }
+    saveSession(next)
+    setSession(next)
+  }, [])
+
   // client.ts 가 401 을 받으면 로그아웃 처리 (명세 3.1)
   useEffect(() => {
     setUnauthorizedHandler(logout)
     return () => setUnauthorizedHandler(null)
   }, [logout])
 
-  const value = useMemo(() => ({ session, login, logout }), [session, login, logout])
+  const value = useMemo(() => ({ session, login, join, logout }), [session, login, join, logout])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

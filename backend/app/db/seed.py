@@ -29,6 +29,7 @@ USERS = [  # (role, name, login_id)
 ]
 FULL = {child: parent_name[0] + child for _, parent_name, child in FAMILIES}  # 지민 → 박지민
 SEED_CHILDREN = [(login, FULL[child]) for login, _, child in FAMILIES]  # 학부모 ↔ 아이 (성 붙은 이름)
+DEMO_INVITE_CODE = "EUM2026"  # teacher1 반 초대 코드 (발표 화면에 띄울 것). 교사 「학생」 탭에도 보임
 FIRST_CONVERSATIONS = SEED_CHILDREN[:2]  # 처음 만들 때 대화 2개 (parent1 ↔ 지민, parent2 ↔ 민준)
 
 with SessionLocal() as db:
@@ -50,6 +51,10 @@ with SessionLocal() as db:
                 {"t": ids["teacher1"], "p": ids[parent], "s": student},
             )
     teacher = db.execute(text("SELECT id FROM users WHERE login_id = 'teacher1'")).scalar()
+    if db.execute(text("UPDATE users SET invite_code = :c WHERE id = :t AND invite_code IS NULL "
+                       "AND NOT EXISTS (SELECT 1 FROM users WHERE invite_code = :c)"),
+                  {"c": DEMO_INVITE_CODE, "t": teacher}).rowcount:
+        added.append(f"초대 코드 {DEMO_INVITE_CODE}")
     renamed = 0
     for given, full in FULL.items():  # 예전 DB: 성 없는 이름 → 성 붙은 이름 (이미 성 붙은 학생이 있으면 그대로)
         renamed += db.execute(text(

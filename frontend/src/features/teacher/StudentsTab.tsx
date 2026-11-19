@@ -5,6 +5,8 @@ import { listStudents, type Student } from '../../api/students'
 import ConversationList from '../chat/ConversationList'
 import { useConversations } from '../chat/useConversations'
 import { useResource } from '../chat/useResource'
+import { useSync } from '../../realtime/useSync'
+import InviteCard from './InviteCard'
 import { MemoPanel } from './StudentMemo'
 import { useStudentMemo } from './useStudentMemo'
 
@@ -12,7 +14,8 @@ const NONE: Student[] = []
 
 // 교사 「학생」 탭: 반 학생 목록 → 학생 한 명 (메모장 + 그 학생과의 대화). 주소 /teacher/students/:id
 export default function StudentsTab() {
-  const { data: students, loaded, error } = useResource(listStudents, NONE)
+  const { data: students, loaded, error, refresh } = useResource(listStudents, NONE)
+  useSync('students', () => void refresh(), (e) => e.type === 'students') // 초대 코드로 새 학부모가 들어오면
   const { conversations } = useConversations()
   return (
     <Routes>
@@ -49,6 +52,7 @@ function StudentList({
         <h2>우리 반 학생</h2>
         <span className="muted">{students.length}명</span>
       </div>
+      <InviteCard />
       <input
         className="notice-input student-search"
         type="search"

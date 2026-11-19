@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
 import { HOME_PATH } from '../../auth/roles'
@@ -64,6 +64,9 @@ export default function LoginPage() {
           {busy ? (<><span className="spinner" />로그인 중</>) : '로그인'}
         </button>
       </form>
+      <p className="join-link">
+        학부모이신가요? <Link to="/join">초대 코드로 시작하기</Link>
+      </p>
     </AppShell>
   )
 }
