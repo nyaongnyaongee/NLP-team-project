@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { deleteConversation } from '../../api/conversations'
+import { closeConversation, deleteConversation } from '../../api/conversations'
 import { sendMessage } from '../../api/messages'
 import type { Conversation } from '../../api/types'
 import { useConversationSync } from '../../realtime/useConversationSync'
@@ -14,6 +14,7 @@ import { useMessages } from '../chat/useMessages'
 // 학부모 대화방. 정제 상태(메시지 status)는 읽지도 표시하지도 않는다 (중대 5).
 // 다만 내 글이 다듬어져 갔는지(refined)는 말풍선 아래에 「정제됨」으로 알리고, 누르면 선생님께 간 정제문을 펼친다.
 // 표시하는 "대화 상태"는 대화(conversation)의 열림/닫힘이며 메시지의 정제 상태와 무관하다.
+// 학부모도 「종료」로 대화를 닫을 수 있다 (할 일·일정 뽑기는 하지 않음 — 담임이 나중에 뽑는다).
 // onDeleted: 종료된 대화를 내 목록에서 지운 뒤 (목록에서 빼고 돌아간다)
 export default function ParentChat({
   conversation: initial,
@@ -26,6 +27,8 @@ export default function ParentChat({
 }) {
   const [busy, setBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [closing, setClosing] = useState(false) // 「종료」를 눌러 한 번 더 묻는 중 (아이폰 Safari 는 확인 창이 안 떠서 화면 안에서 묻는다)
+  const [closeError, setCloseError] = useState<string | null>(null)
   const [openRefined, setOpenRefined] = useState<Set<number>>(() => new Set())
   const toggleRefined = (id: number) =>
     setOpenRefined((prev) => {
@@ -34,7 +37,7 @@ export default function ParentChat({
       else next.add(id)
       return next
     })
-  const { conversation, refresh: refreshConversation } = useConversation(initial)
+  const { conversation, setConversation, refresh: refreshConversation } = useConversation(initial)
   const { messages, loading, error, upsert, refresh: refreshMessages } = useMessages(initial.id)
   useMarkRead(initial.id, messages)
 
@@ -50,6 +53,20 @@ export default function ParentChat({
       upsert(await sendMessage(conversation.id, text))
     } finally {
       refreshAll() // 그사이 선생님이 종료했으면 종료 상태를 받는다. 조회 도중에 보낸 글이 오래된 응답에 지워지지 않게도 한다
+    }
+  }
+
+  const onClose = async () => {
+    setBusy(true)
+    setCloseError(null)
+    try {
+      setConversation(await closeConversation(conversation.id, false))
+      setClosing(false)
+      refreshAll()
+    } catch (e) {
+      setCloseError(e instanceof Error ? e.message : '종료하지 못했습니다')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -76,9 +93,27 @@ export default function ParentChat({
         <span className="avatar">{teacherTitle(conversation).slice(0, 1)}</span>
         <b className="bar-title">{teacherTitle(conversation)}</b>
         <span className="bar-actions">
-          <span className="tag">{conversation.status === 'closed' ? '종료됨' : '대화 중'}</span>
+          {conversation.status === 'closed' ? (
+            <span className="tag">종료됨</span>
+          ) : (
+            <button type="button" className="head-action" onClick={() => setClosing((v) => !v)} disabled={busy}>
+              종료
+            </button>
+          )}
         </span>
       </div>
+      {conversation.status !== 'closed' && closing && (
+        <div className="close-choice" role="group" aria-label="대화 종료">
+          <p className="info">이 대화를 종료할까요? 종료하면 더 보낼 수 없고, 다른 문의는 「＋ 새 문의」로 보낼 수 있어요.</p>
+          {closeError && <p className="alert" role="alert">{closeError}</p>}
+          <button type="button" className="primary" onClick={() => void onClose()} disabled={busy}>
+            대화 종료
+          </button>
+          <button type="button" className="back" onClick={() => setClosing(false)}>
+            취소
+          </button>
+        </div>
+      )}
       {loading && messages.length === 0 && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}
       {!loading && !error && messages.length === 0 && (
@@ -121,7 +156,7 @@ export default function ParentChat({
       {conversation.status === 'closed' ? (
         <>
           <div className="closed-note">
-            선생님이 종료한 대화입니다. 다른 문의는 대화 목록의 「＋ 새 문의」로 보내 주세요.
+            종료된 대화입니다. 다른 문의는 대화 목록의 「＋ 새 문의」로 보내 주세요.
           </div>
           {deleteError && <p className="alert" role="alert">{deleteError}</p>}
           <button type="button" className="delete-item" onClick={() => void onDelete()} disabled={busy}>

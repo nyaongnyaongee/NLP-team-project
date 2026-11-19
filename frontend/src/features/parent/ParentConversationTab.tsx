@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { closeConversation } from '../../api/conversations'
 import ConversationList from '../chat/ConversationList'
 import StartConversation from '../chat/StartConversation'
 import StatusFilter from '../chat/StatusFilter'
@@ -8,7 +9,7 @@ import ParentChat from './ParentChat'
 
 // 학부모 "대화" 탭: 대화 목록 → 대화방 (‹ 대화 목록 으로 돌아옴). 문의마다 「＋ 새 문의」로 새 대화방을 연다.
 export default function ParentConversationTab() {
-  const { conversations, loading, error, add, remove, deleteOne, refresh, markSeen } = useConversations()
+  const { conversations, loading, error, add, remove, deleteOne, refresh, markSeen, replaceOne } = useConversations()
   const open = (id: number) => {
     markSeen(id)
     setSelectedId(id)
@@ -75,6 +76,14 @@ export default function ParentConversationTab() {
         onDelete={(id) => {
           setDeleteError(null)
           void deleteOne(id).catch((e: unknown) => setDeleteError(e instanceof Error ? e.message : '삭제하지 못했습니다'))
+        }}
+        onEnd={(id, alsoDelete) => {
+          // 밀어서 「종료」 · 「삭제」(종료하고 바로 내 목록에서 지움). 할 일·일정은 뽑지 않는다
+          setDeleteError(null)
+          void (async () => {
+            replaceOne(await closeConversation(id, false))
+            if (alsoDelete) await deleteOne(id)
+          })().catch((e: unknown) => setDeleteError(e instanceof Error ? e.message : '종료하지 못했습니다'))
         }}
       />
     </section>

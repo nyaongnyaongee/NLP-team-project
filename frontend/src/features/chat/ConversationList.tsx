@@ -21,7 +21,7 @@ function lastLine(c: Conversation): string | null {
 // 목록은 대화 상대로 표시한다 (교사 화면 「박지민 부모」, 학부모 화면 「김민지 선생님」). 이름 옆에 대화 상태, 그 아래 요약 · 마지막 글 (교사 · 학부모 같음). 주제는 요약과 겹쳐서 안 보인다.
 // 왼쪽으로 밀면 나오는 버튼:
 //  - 종료된 대화: 「삭제」 (onDelete — 내 목록에서만, DB 에는 남음)
-//  - 대화 중 (onEnd 를 준 교사만): 「종료」 · 「삭제」 (onEnd(id, false) = 종료만, onEnd(id, true) = 종료하고 바로 삭제)
+//  - 대화 중 (onEnd 를 준 화면만 — 교사 · 학부모): 「종료」 · 「삭제」 (onEnd(id, false) = 종료만, onEnd(id, true) = 종료하고 바로 삭제)
 export default function ConversationList({
   conversations,
   onSelect,

@@ -95,9 +95,15 @@ def test_닫으면_추출해서_후보로_저장된다(client, auth, ids, engine
     assert datetime.fromisoformat(events[0]["due_at"]) == datetime(2026, 11, 17, 15, 0, tzinfo=KST)
 
 
-def test_학부모는_닫지도_할_일을_보지도_못한다(client, auth, ids, extractor):
-    extractor(DONE)
-    assert close(client, auth, ids["conv_parent1"], "parent1").status_code == 403
+def test_학부모는_닫을_수_있지만_추출은_안_하고_할_일도_못_본다(client, auth, ids, engine, extractor):
+    calls = extractor(DONE)
+    assert close(client, auth, ids["conv_parent2"], "parent1").status_code in (403, 404)  # 남의 대화
+    r = close(client, auth, ids["conv_parent1"], "parent1")
+    assert r.status_code == 202 and r.json()["status"] == "closed"
+    with engine.begin() as c:
+        row = c.execute(text("SELECT status, extract FROM conversations WHERE id = :i"), {"i": ids["conv_parent1"]}).first()
+        c.execute(text("UPDATE conversations SET status = 'open' WHERE id = :i"), {"i": ids["conv_parent1"]})
+    assert row == ("closed", None) and not calls  # Claude 안 부름
     assert client.get("/todos", headers=auth("parent1")).status_code == 403
     assert "extract" not in client.get(f"/conversations/{ids['conv_parent1']}", headers=auth("parent1")).json()
 
