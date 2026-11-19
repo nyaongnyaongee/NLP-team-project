@@ -33,8 +33,9 @@ def test_코드로_들어오면_학부모가_되고_자녀가_반에_이어진�
     me = {"Authorization": "Bearer " + r.json()["token"]}
     rows = client.get("/conversations/startable", headers=me).json()
     assert [(s["student_name"], s["teacher_name"]) for s in rows] == [("김하늘", "김민지")]
-    # 교사 반 명단에도 들어감 → 바로 대화를 열 수 있음
-    assert "김하늘" in [s["name"] for s in client.get("/students", headers=auth("teacher1")).json()]
+    # 교사 반 명단에도 들어감 (이어진 학부모 이름과 함께) → 바로 대화를 열 수 있음
+    roster = {s["name"]: s["parent_name"] for s in client.get("/students", headers=auth("teacher1")).json()}
+    assert roster["김하늘"] == "김보호" and roster["하준"] is None
     assert client.post("/conversations/start", json={"student_id": rows[0]["student_id"]}, headers=me).status_code == 201
 
 

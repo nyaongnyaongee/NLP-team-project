@@ -51,7 +51,7 @@ def _my_student(db: Session, student_id: int, user):
 def my_students(db: Session = Depends(get_db), user=Depends(current_user)):
     _need_teacher(user)
     with_memo = crud.memo_students(db, user["id"])
-    return [{"id": s["id"], "name": s["name"], "has_memo": s["id"] in with_memo}
+    return [{"id": s["id"], "name": s["name"], "has_memo": s["id"] in with_memo, "parent_name": s["parent_name"]}
             for s in crud.list_students(db, user["id"])]
 
 

@@ -403,7 +403,9 @@ def user_ids_with_role(db: Session, role: str) -> list[int]:
 # ---- 학생 · 학생 메모
 
 def list_students(db: Session, teacher_id: int):
-    return db.execute(text("SELECT * FROM students WHERE teacher_id = :t ORDER BY name"), {"t": teacher_id}).mappings().all()
+    """반 학생 (이름 순). parent_name = 이어진 학부모 이름 (없으면 NULL)."""
+    return db.execute(text("SELECT s.*, p.name AS parent_name FROM students s LEFT JOIN users p ON p.id = s.parent_id "
+                           "WHERE s.teacher_id = :t ORDER BY s.name"), {"t": teacher_id}).mappings().all()
 
 
 def student_names(db: Session, teacher_id: int) -> list[str]:

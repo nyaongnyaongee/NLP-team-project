@@ -80,6 +80,8 @@ function StudentList({
                     </span>
                   </span>
                   <span className="row-last">
+                    {s.parent_name ? `${s.parent_name} 학부모` : '학부모 미연결'}
+                    {' · '}
                     {mine.length === 0 ? '대화 없음' : `대화 ${mine.length}개${open ? ` · 진행 중 ${open}` : ''}`}
                   </span>
                 </span>
@@ -136,6 +138,7 @@ function StudentDetail({ students, conversations }: { students: Student[]; conve
         <span className="avatar">{student.name.slice(0, 1)}</span>
         <div>
           <b>{student.name}</b>
+          <small>{student.parent_name ? `학부모 ${student.parent_name}` : '연결된 학부모 없음'}</small>
         </div>
       </div>
       <div className="section-title">
@@ -144,13 +147,20 @@ function StudentDetail({ students, conversations }: { students: Student[]; conve
       <StudentMemoBox key={student.id} studentId={student.id} studentName={student.name} />
 
       <div className="section-title">
-        <h3>대화</h3>
-        <button type="button" className="manual-add" onClick={() => void start()} disabled={busy}>
-          ＋ 새 대화
-        </button>
+        <h3>학부모와의 대화</h3>
+        {student.parent_name && (
+          <button type="button" className="manual-add" onClick={() => void start()} disabled={busy}>
+            ＋ 학부모와 새 대화
+          </button>
+        )}
       </div>
       {error && <p className="alert" role="alert">{error}</p>}
-      {mine.length === 0 && <div className="empty">이 학생과 나눈 대화가 없어요</div>}
+      {!student.parent_name && (
+        <p className="sub">
+          아직 연결된 학부모가 없어요. 학부모가 반 초대 코드와 「{student.name}」 이름으로 들어오면 대화할 수 있어요.
+        </p>
+      )}
+      {mine.length === 0 && student.parent_name && <div className="empty">{student.parent_name} 학부모와 나눈 대화가 없어요</div>}
       <ConversationList conversations={mine} onSelect={openChat} />
     </section>
   )

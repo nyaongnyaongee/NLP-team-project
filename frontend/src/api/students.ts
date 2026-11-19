@@ -2,7 +2,8 @@ import { request } from './client'
 import type { Startable } from './types'
 
 // 학생 · 학생 메모장 (담임만, 학생마다 메모장 하나). 서버 schemas/student.py
-export type Student = { id: number; name: string; has_memo: boolean }
+// parent_name = 이어진 학부모 (없으면 null — 대화를 시작할 수 없고, 초대 코드로 잇는다)
+export type Student = { id: number; name: string; has_memo: boolean; parent_name: string | null }
 
 // 내 반 학생 (이름 순)
 export function listStudents(): Promise<Student[]> {

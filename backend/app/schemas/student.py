@@ -8,6 +8,7 @@ class StudentOut(BaseModel):
     id: int
     name: str
     has_memo: bool  # 내 메모장에 무엇이든 적혀 있는지
+    parent_name: str | None = None  # 이어진 학부모 (없으면 null — 대화를 시작할 수 없음, 초대 코드로 잇는다)
 
 
 class MemoIn(BaseModel):
