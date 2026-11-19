@@ -237,3 +237,17 @@ def test_대화에_담임_학부모_이름이_같이_온다(client, auth, ids):
     assert one["teacher_name"] == client.get("/conversations", headers=auth("teacher1")).json()[0]["teacher_name"]
     mine = client.get(f"/conversations/{ids['conv_parent1']}", headers=auth("teacher1")).json()
     assert mine["parent_name"] == "박서연"
+
+
+def test_지운_대화는_따로_다시_볼_수_있다(client, auth, ids, engine):
+    conv = client.post("/conversations", json={"parent_id": ids["parent1"], "student_name": "지울학생"},
+                       headers=auth("teacher1")).json()["id"]
+    client.post(f"/conversations/{conv}/close", json={"extract": False}, headers=auth("teacher1"))
+    assert client.delete(f"/conversations/{conv}", headers=auth("teacher1")).status_code == 204
+    t = auth("teacher1")
+    assert conv not in [c["id"] for c in client.get("/conversations", headers=t).json()]
+    assert [c["id"] for c in client.get("/conversations?deleted=true", headers=t).json()] == [conv]
+    assert client.get(f"/conversations/{conv}/messages", headers=t).status_code == 200  # 열어 볼 수 있음
+    assert conv not in [c["id"] for c in client.get("/conversations?deleted=true", headers=auth("parent1")).json()]
+    with engine.begin() as c:
+        c.execute(text("DELETE FROM conversations WHERE id = :i"), {"i": conv})

@@ -21,14 +21,16 @@ def get_conversation(db: Session, conv_id: int):
     return db.execute(text("SELECT * FROM conversations WHERE id = :i"), {"i": conv_id}).mappings().first()
 
 
-def list_conversations(db: Session, user_id: int):
+def list_conversations(db: Session, user_id: int, deleted: bool = False):
+    """내 대화 목록. deleted=True 면 반대로 내 목록에서 지운 대화만 (행은 DB 에 남아 있으므로 다시 볼 수 있다)."""
+    where = ("(c.teacher_id = :u AND c.teacher_deleted_at IS NOT NULL) OR (c.parent_id = :u AND c.parent_deleted_at IS NOT NULL)"
+             if deleted else
+             "(c.teacher_id = :u AND c.teacher_deleted_at IS NULL) OR (c.parent_id = :u AND c.parent_deleted_at IS NULL)")
     return db.execute(
         text("SELECT c.*, (SELECT max(m.created_at) FROM messages m WHERE m.conversation_id = c.id) AS last_message_at, "
              "(SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id <> :u AND m.id > "
              " COALESCE(CASE WHEN c.teacher_id = :u THEN c.teacher_read_id ELSE c.parent_read_id END, 0)) AS unread "
-             "FROM conversations c WHERE (c.teacher_id = :u AND c.teacher_deleted_at IS NULL) "
-             "OR (c.parent_id = :u AND c.parent_deleted_at IS NULL) "
-             "ORDER BY c.id"),
+             f"FROM conversations c WHERE {where} ORDER BY c.id"),
         {"u": user_id},
     ).mappings().all()
 

@@ -112,8 +112,9 @@ def _preview(conv, msgs, user) -> dict:
 
 
 @router.get("/conversations")
-def my_conversations(db: Session = Depends(get_db), user=Depends(current_user)):
-    convs = crud.list_conversations(db, user["id"])
+def my_conversations(deleted: bool = False, db: Session = Depends(get_db), user=Depends(current_user)):
+    """내 대화 목록. ?deleted=true 면 내 목록에서 지운 대화 (다시 열어 볼 수 있다 — 지우기는 목록에서만 빼는 것)."""
+    convs = crud.list_conversations(db, user["id"], deleted)
     return [{**_conv_view(c, user, db), "preview": _preview(c, crud.list_messages(db, c["id"]), user)} for c in convs]
 
 
