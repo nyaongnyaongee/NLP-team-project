@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listStartable, startConversation } from '../../api/conversations'
 import { sendMessage } from '../../api/messages'
@@ -11,21 +11,26 @@ import { useResource } from '../chat/useResource'
 const NONE: Startable[] = []
 const MAX = 2000
 
-// 「예시로 체험하기」: 누르면 입력칸에 채워진다 (시연용). {child} = 고른 자녀 이름
-const EXAMPLES: { label: string; text: string }[] = [
+// 「자주 쓰는 글」: 누르면 입력칸에 틀이 채워지고 첫 빈칸(○ 또는 (…))이 선택된다. {child} = 고른 자녀 이름
+const TEMPLATES: { label: string; text: string }[] = [
+  {
+    label: '결석',
+    text: '선생님 안녕하세요. {child}가 ○월 ○일에 (사유) 때문에 결석하려고 합니다.',
+  },
+  {
+    label: '조퇴 · 지각',
+    text: '선생님 안녕하세요. {child}가 ○월 ○일 ○시에 (사유)로 조퇴하려고 합니다. ○시쯤 데리러 가겠습니다.',
+  },
   {
     label: '체험학습 신청',
-    text: '선생님 안녕하세요. 다음 주 수요일, 목요일에 가족 여행이 있어서 {child} 교외체험학습을 신청하려고 합니다. 신청서는 언제까지 내면 될까요? 다녀와서 낼 보고서 양식도 함께 받을 수 있으면 좋겠습니다.',
+    text: '선생님 안녕하세요. ○월 ○일부터 ○일까지 (사유)로 {child} 교외체험학습을 신청하려고 합니다. 신청서는 언제까지 내면 될까요?',
   },
   {
-    label: '조퇴 · 병원',
-    text: '선생님, {child}가 내일 오후 2시에 치과 예약이 있어서 5교시 마치고 조퇴하려고 합니다. 1시 50분쯤 교문 앞으로 데리러 가겠습니다.',
-  },
-  {
-    label: '항의 · 처벌 요구',
-    text: '선생님 몇 번을 말씀드려야 하나요? 현우가 또 {child}를 밀어서 무릎이 까졌는데 아직도 같은 모둠이에요? 도대체 애들을 어떻게 보시는 거예요. 현우 부모님 연락처 주시고 내일까지 자리 떨어뜨려 주세요. 안 되면 교육청에 민원 넣겠습니다.',
+    label: '상담 요청',
+    text: '선생님 안녕하세요. {child} (상담할 내용) 때문에 상담을 받고 싶습니다. 편하신 시간을 알려 주시면 맞추겠습니다.',
   },
 ]
+const BLANK = /○|\([^)]*\)/
 
 // 학부모 첫 화면 「메시지 작성」: 담임 카드(자녀가 여럿이면 골라서) + 글쓰기. 보내면 새 대화방이 열리고 그 방으로 간다 (문의마다 대화방)
 export default function ParentCompose() {
@@ -35,7 +40,8 @@ export default function ParentCompose() {
   const { data: kids, setData, loaded, error } = useResource(load, NONE)
   const [pickedId, setPickedId] = useState<number | null>(null)
   const [text, setText] = useState('')
-  const [showExamples, setShowExamples] = useState(true)
+  const [showTemplates, setShowTemplates] = useState(true)
+  const textRef = useRef<HTMLTextAreaElement>(null)
   const [busy, setBusy] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
@@ -44,6 +50,18 @@ export default function ParentCompose() {
   // 부르는 이름: 받침이 있으면 「이」를 붙인다 (지민 → 지민이가, 지우 → 지우가)
   const last = given.charCodeAt(given.length - 1)
   const childName = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0 ? `${given}이` : given
+
+  function applyTemplate(template: string) {
+    const filled = template.replaceAll('{child}', childName)
+    setText(filled)
+    const m = BLANK.exec(filled)
+    requestAnimationFrame(() => {
+      const el = textRef.current
+      if (!el) return
+      el.focus()
+      if (m) el.setSelectionRange(m.index, m.index + m[0].length)
+    })
+  }
 
   async function onSend() {
     const body = text.trim()
@@ -115,24 +133,21 @@ export default function ParentCompose() {
         <>
           <div className="compose-head">
             <h3>메시지 작성</h3>
-            <button type="button" className="link-button" onClick={() => setShowExamples((v) => !v)}>
-              {showExamples ? '예시 숨기기' : '예시로 체험하기'}
+            <button type="button" className="link-button" onClick={() => setShowTemplates((v) => !v)}>
+              {showTemplates ? '자주 쓰는 글 숨기기' : '자주 쓰는 글'}
             </button>
           </div>
-          {showExamples && (
+          {showTemplates && (
             <div className="example-chips">
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex.label}
-                  type="button"
-                  onClick={() => setText(ex.text.replaceAll('{child}', childName))}
-                >
-                  {ex.label}
+              {TEMPLATES.map((t) => (
+                <button key={t.label} type="button" onClick={() => applyTemplate(t.text)}>
+                  {t.label}
                 </button>
               ))}
             </div>
           )}
           <textarea
+            ref={textRef}
             className="compose-text"
             value={text}
             maxLength={MAX}
