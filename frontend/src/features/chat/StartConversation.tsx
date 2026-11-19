@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { listStartable, startConversation } from '../../api/conversations'
 import type { Conversation, Startable } from '../../api/types'
+import AddChild from './AddChild'
 import { useResource } from './useResource'
 
 const NONE: Startable[] = []
@@ -17,7 +18,7 @@ export default function StartConversation({
   onCancel?: () => void
 }) {
   const load = useCallback(() => listStartable(), [])
-  const { data, loaded, error } = useResource(load, NONE)
+  const { data, setData, loaded, error } = useResource(load, NONE)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [startError, setStartError] = useState<string | null>(null)
   const busyRef = useRef(false)
@@ -52,7 +53,7 @@ export default function StartConversation({
       {startError && <p className="alert" role="alert">{startError}</p>}
       {loaded && !error && data.length === 0 && (
         <p className="sub">
-          {role === 'teacher' ? '학부모가 등록된 학생이 없어요' : '등록된 자녀가 없어요. 학교에 문의해 주세요'}
+          {role === 'teacher' ? '학부모가 등록된 학생이 없어요' : '등록된 자녀가 없어요. 담임 선생님께 받은 초대 코드로 자녀를 추가해 주세요'}
         </p>
       )}
       <ul className="plain-list">
@@ -85,6 +86,13 @@ export default function StartConversation({
           </li>
         ))}
       </ul>
+      {role === 'parent' && loaded && (
+        <AddChild
+          onAdded={(s) =>
+            setData((rows) => [...rows, s].sort((a, b) => a.student_name.localeCompare(b.student_name, 'ko')))
+          }
+        />
+      )}
     </section>
   )
 }

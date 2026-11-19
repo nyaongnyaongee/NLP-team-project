@@ -96,6 +96,7 @@ UPGRADES = [
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (student_id, teacher_id)
     )""",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT UNIQUE",  # 교사 반 초대 코드 (학부모 자녀 잇기)
     """DO $$ BEGIN
       IF to_regclass('public.student_notes') IS NOT NULL THEN
         INSERT INTO student_memos (student_id, teacher_id, body, updated_at)

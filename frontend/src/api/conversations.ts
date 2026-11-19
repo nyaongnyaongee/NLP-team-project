@@ -1,8 +1,9 @@
 import { request } from './client'
 import type { Conversation, Startable } from './types'
 
-export function listConversations(): Promise<Conversation[]> {
-  return request<Conversation[]>('/conversations')
+// deleted = true 면 내 목록에서 지운 대화 (DB 에 남아 있어 다시 열어 볼 수 있다)
+export function listConversations(deleted = false): Promise<Conversation[]> {
+  return request<Conversation[]>(deleted ? '/conversations?deleted=true' : '/conversations')
 }
 
 export function listStartable(): Promise<Startable[]> {

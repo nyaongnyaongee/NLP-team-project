@@ -112,8 +112,9 @@ def _preview(conv, msgs, user) -> dict:
 
 
 @router.get("/conversations")
-def my_conversations(db: Session = Depends(get_db), user=Depends(current_user)):
-    convs = crud.list_conversations(db, user["id"])
+def my_conversations(deleted: bool = False, db: Session = Depends(get_db), user=Depends(current_user)):
+    """내 대화 목록. ?deleted=true 면 내 목록에서 지운 대화 (다시 열어 볼 수 있다 — 지우기는 목록에서만 빼는 것)."""
+    convs = crud.list_conversations(db, user["id"], deleted)
     return [{**_conv_view(c, user, db), "preview": _preview(c, crud.list_messages(db, c["id"]), user)} for c in convs]
 
 
@@ -164,11 +165,13 @@ def create_conversation(body: ConversationIn, db: Session = Depends(get_db), use
 @router.post("/conversations/{conv_id}/close", status_code=202)
 def close_conversation(conv_id: int, background: BackgroundTasks, body: ConversationCloseIn | None = None,
                        db: Session = Depends(get_db), user=Depends(current_user)):
-    """대화 닫기. 본문 {"extract": true}(기본 · 본문 없음)이면 백그라운드에서 할 일 · 일정 후보를 뽑고,
-    false 면 닫기만 한다 (Claude 안 부름). 이미 닫혀 있으면 그대로 돌려준다."""
-    extract = body.extract if body else True
+    """대화 닫기 (담임 · 그 대화의 학부모). 담임이 본문 {"extract": true}(기본 · 본문 없음)로 닫으면 백그라운드에서
+    할 일 · 일정 후보를 뽑고, false 면 닫기만 한다 (Claude 안 부름). 학부모는 늘 닫기만 한다 — 뽑기는 담임이 나중에
+    「할 일·일정 뽑기」로. 이미 닫혀 있으면 그대로 돌려준다."""
     conv = messages_router._my_conversation(db, conv_id, user)
-    _need_owner_teacher(conv, user)
+    if user["id"] not in (conv["teacher_id"], conv["parent_id"]):
+        raise HTTPException(403, "이 대화의 담임 · 학부모만 종료할 수 있습니다")
+    extract = (body.extract if body else True) and user["id"] == conv["teacher_id"]
     if conv["status"] == "closed":
         return _conv_view(conv, user, db)
     conv = crud.set_conversation_status(db, conv_id, "closed", extract)

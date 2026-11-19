@@ -6,7 +6,8 @@ CREATE TABLE users (
   role          TEXT NOT NULL CHECK (role IN ('parent', 'teacher', 'complaint_team')),
   name          TEXT NOT NULL,              -- 성까지 (가명처리 어른 명단으로 씀)
   login_id      TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL
+  password_hash TEXT NOT NULL,
+  invite_code   TEXT UNIQUE                 -- 교사의 반 초대 코드 (학부모가 이 코드로 자녀를 반에 잇는다). 교사만
 );
 
 -- 학생: 담임 한 명의 반 (「반」 테이블은 시연에서 안 만듦 — teacher_id 가 곧 반). 가명처리 학생 명단도 여기서

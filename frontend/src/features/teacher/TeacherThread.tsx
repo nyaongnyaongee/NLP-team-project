@@ -29,11 +29,13 @@ export default function TeacherThread({
   onLeave,
   onBack,
   onDeleted,
+  deleted = false,
 }: {
   conversation: Conversation
   onLeave: (message: string) => void
   onBack: () => void
   onDeleted: (id: number) => void
+  deleted?: boolean // 내 목록에서 지운 대화를 다시 보는 중 (학생 탭 「삭제한 대화」) — 「대화 삭제」 버튼을 숨긴다
 }) {
   const { conversation, setConversation, refresh: refreshConversation } = useConversation(initial)
   const { messages, loading, error, upsert, refresh: refreshMessages } = useMessages(initial.id)
@@ -250,7 +252,7 @@ export default function TeacherThread({
       {/* 종료된 대화에는 입력창을 숨긴다: 서버가 종료된 대화의 글을 막는다 (409) */}
       {closed ? (
         <>
-          <div className="closed-note">이 대화는 종료되었습니다.</div>
+          <div className="closed-note">{deleted ? '종료하고 목록에서 삭제한 대화입니다.' : '이 대화는 종료되었습니다.'}</div>
           <CandidatePanel
             candidates={candidates}
             loading={!candidatesLoaded && candidatesError === null}
@@ -258,9 +260,11 @@ export default function TeacherThread({
             onUpdated={(t) => setCandidates((prev) => prev.map((p) => (p.id === t.id ? t : p)))}
             onRemoved={(id) => setCandidates((prev) => prev.filter((p) => p.id !== id))}
           />
-          <button type="button" className="delete-item" onClick={onDelete} disabled={busy}>
-            대화 삭제
-          </button>
+          {!deleted && (
+            <button type="button" className="delete-item" onClick={onDelete} disabled={busy}>
+              대화 삭제
+            </button>
+          )}
         </>
       ) : (
         <>

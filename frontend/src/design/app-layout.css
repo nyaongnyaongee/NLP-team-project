@@ -192,3 +192,65 @@ ul.plain-list {
   border-top: 0;
   margin-top: 0;
 }
+
+/* 초대 코드: 로그인 · 초대 화면 아래 링크, 교사 「학생」 탭의 코드 · QR 카드, 학부모 자녀 추가 */
+.join-link {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--secondary);
+}
+.join-link a {
+  color: var(--primary-strong);
+  font-weight: 700;
+}
+input.invite-input,
+.manual-form input.invite-input {
+  letter-spacing: 0.12em;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+.invite-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--white);
+  padding: 14px 16px;
+  margin: 14px 0;
+}
+.invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.invite-row small {
+  display: block;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.invite-code {
+  display: block;
+  font-size: 24px;
+  letter-spacing: 0.14em;
+  color: var(--primary-strong);
+  overflow-wrap: anywhere;
+}
+.invite-qr {
+  text-align: center;
+  margin-top: 14px;
+}
+.invite-qr img {
+  width: min(100%, 280px);
+  height: auto;
+  image-rendering: pixelated;
+}
+.invite-qr small {
+  display: block;
+  font-size: 12px;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.add-child {
+  margin-top: 8px;
+}
+.deleted-conversations { margin-top: 18px; }

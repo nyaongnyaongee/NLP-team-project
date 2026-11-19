@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import RequireRole from './auth/RequireRole'
 import { HOME_PATH } from './auth/roles'
+import JoinPage from './features/login/JoinPage'
 import LoginPage from './features/login/LoginPage'
 import ParentHome from './features/parent/ParentHome'
 import TeacherHome from './features/teacher/TeacherHome'
@@ -22,6 +23,7 @@ export default function App() {
         <RealtimeProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/join" element={<JoinPage />} />
             <Route
               path="/parent/*"
               element={

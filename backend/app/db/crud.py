@@ -21,14 +21,16 @@ def get_conversation(db: Session, conv_id: int):
     return db.execute(text("SELECT * FROM conversations WHERE id = :i"), {"i": conv_id}).mappings().first()
 
 
-def list_conversations(db: Session, user_id: int):
+def list_conversations(db: Session, user_id: int, deleted: bool = False):
+    """내 대화 목록. deleted=True 면 반대로 내 목록에서 지운 대화만 (행은 DB 에 남아 있으므로 다시 볼 수 있다)."""
+    where = ("(c.teacher_id = :u AND c.teacher_deleted_at IS NOT NULL) OR (c.parent_id = :u AND c.parent_deleted_at IS NOT NULL)"
+             if deleted else
+             "(c.teacher_id = :u AND c.teacher_deleted_at IS NULL) OR (c.parent_id = :u AND c.parent_deleted_at IS NULL)")
     return db.execute(
         text("SELECT c.*, (SELECT max(m.created_at) FROM messages m WHERE m.conversation_id = c.id) AS last_message_at, "
              "(SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_id <> :u AND m.id > "
              " COALESCE(CASE WHEN c.teacher_id = :u THEN c.teacher_read_id ELSE c.parent_read_id END, 0)) AS unread "
-             "FROM conversations c WHERE (c.teacher_id = :u AND c.teacher_deleted_at IS NULL) "
-             "OR (c.parent_id = :u AND c.parent_deleted_at IS NULL) "
-             "ORDER BY c.id"),
+             f"FROM conversations c WHERE {where} ORDER BY c.id"),
         {"u": user_id},
     ).mappings().all()
 
@@ -403,7 +405,9 @@ def user_ids_with_role(db: Session, role: str) -> list[int]:
 # ---- 학생 · 학생 메모
 
 def list_students(db: Session, teacher_id: int):
-    return db.execute(text("SELECT * FROM students WHERE teacher_id = :t ORDER BY name"), {"t": teacher_id}).mappings().all()
+    """반 학생 (이름 순). parent_name = 이어진 학부모 이름 (없으면 NULL)."""
+    return db.execute(text("SELECT s.*, p.name AS parent_name FROM students s LEFT JOIN users p ON p.id = s.parent_id "
+                           "WHERE s.teacher_id = :t ORDER BY s.name"), {"t": teacher_id}).mappings().all()
 
 
 def student_names(db: Session, teacher_id: int) -> list[str]:
@@ -435,6 +439,71 @@ def save_memo(db: Session, student_id: int, teacher_id: int, body: str):
     ).mappings().first()
     db.commit()
     return row
+
+
+# ---- 초대 코드: 학부모가 교사의 반 코드 + 자녀 이름으로 자녀를 잇는다
+
+INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 헷갈리는 I · O · 0 · 1 은 뺌
+
+
+def normalize_code(code: str) -> str:
+    return "".join(ch for ch in code.upper() if ch.isalnum())
+
+
+def teacher_by_invite(db: Session, code: str):
+    code = normalize_code(code)
+    if not code:
+        return None
+    return db.execute(text("SELECT * FROM users WHERE role = 'teacher' AND invite_code = :c"), {"c": code}).mappings().first()
+
+
+def teacher_invite_code(db: Session, teacher_id: int) -> str:
+    """교사의 초대 코드. 없으면 새로 만든다 (6자리)."""
+    import secrets
+
+    code = db.execute(text("SELECT invite_code FROM users WHERE id = :i"), {"i": teacher_id}).scalar()
+    while not code:
+        cand = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(6))
+        if db.execute(text("SELECT 1 FROM users WHERE invite_code = :c"), {"c": cand}).scalar():
+            continue
+        db.execute(text("UPDATE users SET invite_code = :c WHERE id = :i"), {"c": cand, "i": teacher_id})
+        db.commit()
+        code = cand
+    return code
+
+
+def create_guest_parent(db: Session, name: str):
+    """가입 없이 들어온 학부모 (시연). 아이디 · 비밀번호는 아무도 모르게 만들고 토큰으로만 쓴다. commit 은 부르는 쪽이."""
+    import secrets
+
+    from app.core.auth import hash_password
+
+    return db.execute(
+        text("INSERT INTO users (role, name, login_id, password_hash) VALUES ('parent', :n, :l, :p) RETURNING *"),
+        {"n": name, "l": "guest-" + secrets.token_hex(6), "p": hash_password(secrets.token_urlsafe(24))},
+    ).mappings().first()
+
+
+def child_link_problem(db: Session, teacher_id: int, parent_id: int | None, name: str) -> str | None:
+    """잇지 못하는 까닭 (되면 None). 같은 반에 같은 이름의 학생이 다른 학부모와 이어져 있으면 안 된다."""
+    s = db.execute(text("SELECT parent_id FROM students WHERE teacher_id = :t AND name = :n"),
+                   {"t": teacher_id, "n": name}).mappings().first()
+    if s is None or s["parent_id"] is None:
+        return None
+    if s["parent_id"] == parent_id:
+        return "이미 연결된 자녀입니다"
+    return "이미 다른 보호자와 연결된 학생입니다. 자녀 이름을 확인해 주세요"
+
+
+def link_child(db: Session, teacher_id: int, parent_id: int, name: str) -> int:
+    """반 명단에 그 이름이 있고 학부모가 없으면 잇고, 없으면 반에 새로 넣는다 (시연: 반은 하나, 들어온 학부모의 아이가 반에 더해짐).
+    child_link_problem 으로 먼저 확인할 것. commit 은 부르는 쪽이. 학생 id 를 돌려준다."""
+    sid = db.execute(text("UPDATE students SET parent_id = :p WHERE teacher_id = :t AND name = :n AND parent_id IS NULL "
+                          "RETURNING id"), {"p": parent_id, "t": teacher_id, "n": name}).scalar()
+    if sid is None:
+        sid = db.execute(text("INSERT INTO students (teacher_id, name, parent_id) VALUES (:t, :n, :p) RETURNING id"),
+                         {"t": teacher_id, "n": name, "p": parent_id}).scalar()
+    return sid
 
 
 # ---- 시험용 초기화 (/dev/reset)
