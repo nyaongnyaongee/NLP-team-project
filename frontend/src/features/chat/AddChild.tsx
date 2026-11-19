@@ -12,7 +12,7 @@ export default function AddChild({ onAdded }: { onAdded: (s: Startable) => void 
 
   if (!open) {
     return (
-      <button type="button" className="outline" onClick={() => setOpen(true)}>
+      <button type="button" className="outline add-child-toggle" onClick={() => setOpen(true)}>
         ＋ 초대 코드로 자녀 추가
       </button>
     )

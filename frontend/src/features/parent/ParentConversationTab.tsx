@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { closeConversation } from '../../api/conversations'
 import ConversationList from '../chat/ConversationList'
 import StartConversation from '../chat/StartConversation'
@@ -15,7 +16,15 @@ export default function ParentConversationTab() {
     setSelectedId(id)
   }
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  // 「메시지 작성」에서 보내고 왔으면 그 대화방을 바로 연다 (state.open = 대화 번호)
+  const [selectedId, setSelectedId] = useState<number | null>(
+    () => (location.state as { open?: number } | null)?.open ?? null,
+  )
+  useEffect(() => {
+    if ((location.state as { open?: number } | null)?.open) navigate('.', { replace: true, state: null }) // 뒤로 가기 때 다시 열리지 않게
+  }, [location.state, navigate])
   const [starting, setStarting] = useState(false)
   const { show, setShow, shown, openCount, closedCount } = useStatusFilter(conversations) // 대화 중 / 종료된 대화
   const selected = conversations.find((c) => c.id === selectedId) ?? null
