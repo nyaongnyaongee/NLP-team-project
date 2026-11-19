@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { closeConversation } from '../../api/conversations'
 import ConversationList from '../chat/ConversationList'
 import StartConversation from '../chat/StartConversation'
@@ -11,22 +11,23 @@ import ParentChat from './ParentChat'
 // 학부모 "대화" 탭: 대화 목록 → 대화방 (‹ 대화 목록 으로 돌아옴). 문의마다 「＋ 새 문의」로 새 대화방을 연다.
 export default function ParentConversationTab() {
   const { conversations, loading, error, add, remove, deleteOne, refresh, markSeen, replaceOne } = useConversations()
-  const open = (id: number) => {
-    markSeen(id)
-    setSelectedId(id)
-  }
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  // 열린 대화는 주소(?chat=번호)에 둔다: 브라우저 뒤로 가기로 대화 목록에 돌아온다.
   const location = useLocation()
   const navigate = useNavigate()
-  // 「메시지 작성」에서 보내고 왔으면 그 대화방을 바로 연다 (state.open = 대화 번호)
-  const [selectedId, setSelectedId] = useState<number | null>(
-    () => (location.state as { open?: number } | null)?.open ?? null,
-  )
-  useEffect(() => {
-    if ((location.state as { open?: number } | null)?.open) navigate('.', { replace: true, state: null }) // 뒤로 가기 때 다시 열리지 않게
-  }, [location.state, navigate])
+  const [params] = useSearchParams()
+  const selectedId = Number(params.get('chat')) || null
+  const open = (id: number) => {
+    markSeen(id)
+    navigate({ search: `?chat=${id}` }, { state: { fromList: true } })
+  }
+  // 대화방에서 목록으로: 목록에서 눌러 들어왔으면 기록을 한 칸 되돌리고(뒤로 가기와 같음), 아니면 이 기록을 목록으로 바꾼다
+  const closeThread = () => {
+    if ((location.state as { fromList?: boolean } | null)?.fromList) navigate(-1)
+    else navigate('.', { replace: true })
+  }
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
-  const { show, setShow, shown, openCount, closedCount } = useStatusFilter(conversations) // 대화 중 / 종료된 대화
+  const { show, setShow, shown, openCount, closedCount, sortControl } = useStatusFilter(conversations, 'parent') // 대화 중 / 종료된 대화
   const selected = conversations.find((c) => c.id === selectedId) ?? null
 
   if (selected) {
@@ -35,12 +36,12 @@ export default function ParentConversationTab() {
         key={selected.id}
         conversation={selected}
         onBack={() => {
-          setSelectedId(null)
+          closeThread()
           void refresh() // 보는 동안 읽은 것을 목록 숫자에 반영
         }}
         onDeleted={(id) => {
           remove(id)
-          setSelectedId(null)
+          closeThread()
         }}
       />
     )
@@ -68,14 +69,14 @@ export default function ParentConversationTab() {
             add(c)
             setStarting(false)
             setShow('open')
-            setSelectedId(c.id)
+            open(c.id)
           }}
         />
       )}
       {empty && <p className="sub">문의할 내용마다 새 대화를 열 수 있어요</p>}
       {!empty && !loading && (
         <StatusFilter show={show} setShow={setShow} openCount={openCount} closedCount={closedCount}
-          shownCount={shown.length} />
+          shownCount={shown.length} sort={sortControl} />
       )}
       {deleteError && <p className="alert" role="alert">{deleteError}</p>}
       <ConversationList

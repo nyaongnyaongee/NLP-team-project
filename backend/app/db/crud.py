@@ -131,7 +131,9 @@ def set_conversation_status(db: Session, conv_id: int, status: str, extract: boo
     추출 없이 닫으면 추출 상태는 그대로 둔다 (예전에 뽑은 후보 · 상태가 남음)."""
     extract = "CAST('{\"status\": \"pending\"}' AS JSONB)" if status == "closed" and extract else "extract"
     row = db.execute(
-        text(f"UPDATE conversations SET status = :st, extract = {extract} WHERE id = :i RETURNING *"),
+        text(f"UPDATE conversations SET status = :st, extract = {extract}, "
+             "closed_at = CASE WHEN :st = 'closed' THEN COALESCE(closed_at, now()) ELSE NULL END "
+             "WHERE id = :i RETURNING *"),
         {"st": status, "i": conv_id},
     ).mappings().first()
     db.commit()
@@ -209,15 +211,20 @@ def get_task(db: Session, task_id: int):
     ).mappings().first()
 
 
-def create_event(db: Session, teacher_id: int, title: str, due_at, shared: bool) -> int:
-    """교사가 직접 등록하는 반 전체 일정 (대화 없음). 바로 「추가됨」."""
+def create_task(db: Session, teacher_id: int, kind: str, title: str, due_at, shared: bool = True) -> int:
+    """교사가 직접 등록하는 할 일 · 일정 (대화 없음). 바로 「추가됨」. 일정의 반 전체 공유는 shared."""
     new_id = db.execute(
         text("INSERT INTO tasks (teacher_id, kind, title, due_at, status, shared) "
-             "VALUES (:t, 'event', :ti, :d, 'added', :s) RETURNING id"),
-        {"t": teacher_id, "ti": title, "d": due_at, "s": shared},
+             "VALUES (:t, :k, :ti, :d, 'added', :s) RETURNING id"),
+        {"t": teacher_id, "k": kind, "ti": title, "d": due_at, "s": shared},
     ).scalar()
     db.commit()
     return new_id
+
+
+def create_event(db: Session, teacher_id: int, title: str, due_at, shared: bool) -> int:
+    """교사가 직접 등록하는 반 전체 일정."""
+    return create_task(db, teacher_id, "event", title, due_at, shared)
 
 
 def parent_events(db: Session, parent_id: int):
@@ -327,12 +334,13 @@ def notice_recipients(db: Session, teacher_id: int) -> list[int]:
 # ---- 공지 댓글
 
 def list_notice_comments(db: Session, notice_id: int):
-    """오래된 것부터. 쓴 사람 이름: 교사는 교사 이름, 학부모는 「(그 담임 반) 아이 이름 학부모」 (없으면 학부모 이름)."""
+    """오래된 것부터. 쓴 사람 이름: 교사는 「교사 이름 선생님」, 학부모는 「박서연 (박지민의 학부모)」
+    (그 담임 반 아이 이름, 여럿이면 「박지민, 박지후의 학부모」. 반에 아이가 없으면 「박서연 학부모」)."""
     return db.execute(
         text("SELECT c.id, c.notice_id, c.author_id, u.role AS author_role, c.body, c.created_at, "
              "  CASE WHEN u.role = 'teacher' THEN u.name || ' 선생님' "
-             "       ELSE COALESCE((SELECT string_agg(s.name, ', ' ORDER BY s.name) FROM students s "
-             "                      WHERE s.parent_id = u.id AND s.teacher_id = n.teacher_id) || ' 학부모', "
+             "       ELSE COALESCE(u.name || ' (' || (SELECT string_agg(s.name, ', ' ORDER BY s.name) FROM students s "
+             "                      WHERE s.parent_id = u.id AND s.teacher_id = n.teacher_id) || '의 학부모)', "
              "                     u.name || ' 학부모') END AS author_name "
              "FROM notice_comments c JOIN users u ON u.id = c.author_id JOIN notices n ON n.id = c.notice_id "
              "WHERE c.notice_id = :n ORDER BY c.created_at, c.id"),

@@ -254,3 +254,224 @@ input.invite-input,
   margin-top: 8px;
 }
 .deleted-conversations { margin-top: 18px; }
+
+/* 정렬 메뉴: 대화 목록은 「대화 중 / 종료된 대화」 칩 오른쪽, 학생 목록은 검색칸 옆에 작게 */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 8px;
+}
+.filter-row .chips {
+  flex: 0 1 auto;
+}
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-row .student-search {
+  flex: 1;
+  min-width: 0;
+}
+.sort-menu {
+  position: relative;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.filter-row .sort-menu {
+  margin-top: 4px;
+}
+.sort-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 10px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.sort-arrow {
+  color: var(--primary-strong);
+  font-weight: 800;
+}
+.sort-caret {
+  margin-left: 2px;
+  font-size: 10px;
+  color: var(--secondary);
+}
+.sort-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 150px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: 0 6px 20px rgb(20 40 80 / 0.18);
+}
+.sort-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.sort-list button.active {
+  background: var(--light-blue);
+  color: var(--primary-strong);
+}
+
+/* 대화 줄: 카드 안에 「대화 열기」 버튼 + 작은 「⋯」 (스와이프의 대체 경로). 시작 일자도 작게 */
+.row-card {
+  align-items: flex-start;
+  gap: 4px;
+}
+.row-card .row-open {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.row-card .row-title small {
+  font-size: 11px;
+}
+/* 카드: ⋯(호버 시) · ✕(열린 동안)를 › 자리에 겹쳐 놓는다 — 글 자리를 차지하지 않는다 */
+.row-card {
+  position: relative;
+}
+.row-card .row-chevron {
+  align-self: center;
+}
+.row-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--secondary);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+.row-close {
+  color: var(--primary-strong);
+  background: var(--light-blue);
+}
+.row-card:has(.row-close) .row-chevron {
+  visibility: hidden;
+}
+/* ⋯: 터치 기기에서는 없고, 마우스 기기에서는 카드 호버 · 키보드 포커스 때만 즉시 보인다 (숨겨 둘 때도 포커스는 받는다) */
+.row-more {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .row-more {
+    display: block;
+    opacity: 0;
+  }
+  .row-card:hover .row-more,
+  .row-card:focus-within .row-more {
+    opacity: 1;
+  }
+  .row-card:hover:has(.row-more) .row-chevron,
+  .row-card:focus-within:has(.row-more) .row-chevron {
+    visibility: hidden;
+  }
+}
+
+/* 동작 버튼 열: 세로로 쌓고, 확인 단계에서는 누른 버튼 하나가 열 전체를 쓴다 */
+.swipe-actions {
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 6px;
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.swipe-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swipe-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  opacity: var(--reveal, 1); /* 미는 만큼 글자가 진해진다 */
+}
+.swipe.settle .swipe-label {
+  transition: opacity 220ms ease;
+}
+.swipe-action b {
+  font-size: 14px;
+}
+.swipe-action small {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.swipe.confirming .swipe-action:not(.confirm) {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-front.settle,
+  .swipe-actions,
+  .swipe.settle .swipe-label {
+    transition: none;
+  }
+}
+
+/* 채팅: 위를 보는 중에 새 메시지가 왔을 때 입력창 바로 위에 뜨는 버튼 (.chat-compose 가 sticky 라 그 위에 붙는다) */
+.new-message-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  pointer-events: none;
+}
+.new-message-btn {
+  pointer-events: auto;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 19px;
+  background: var(--primary-strong);
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgb(20 40 80 / 0.25);
+}

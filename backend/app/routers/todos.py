@@ -8,7 +8,7 @@ from app.core.auth import current_user
 from app.db import crud
 from app.db.database import get_db
 from app.routers.ws import hub
-from app.schemas.todo import ParentEventOut, TaskOut, TaskPatch
+from app.schemas.todo import ParentEventOut, TaskOut, TaskPatch, TodoIn
 
 
 def task_router(kind: str, path: str, tag: str) -> APIRouter:
@@ -63,3 +63,14 @@ def task_router(kind: str, path: str, tag: str) -> APIRouter:
 
 
 router = task_router("todo", "todos", "todos")
+
+
+@router.post("/todos", response_model=TaskOut, status_code=201)
+def create_todo(body: TodoIn, db: Session = Depends(get_db), user=Depends(current_user)):
+    """교사가 직접 등록하는 할 일 (대화 없음, 바로 「추가됨」). 할 일은 교사만 보므로 알림은 없다."""
+    if user["role"] != "teacher":
+        raise HTTPException(403, "교사만 할 일을 등록할 수 있습니다")
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(422, "제목을 입력해 주세요")
+    return TaskOut(**crud.get_task(db, crud.create_task(db, user["id"], "todo", title, body.due_at, False)))

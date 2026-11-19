@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { closeConversation } from '../../api/conversations'
 import ConversationList from '../chat/ConversationList'
 import StartConversation from '../chat/StartConversation'
 import StatusFilter from '../chat/StatusFilter'
+import { revealRef } from '../chat/useReveal'
 import { useStatusFilter } from '../chat/useStatusFilter'
 import { useConversations } from '../chat/useConversations'
 import { useOpenTodoCount } from '../tasks/useOpenTodoCount'
@@ -27,28 +28,29 @@ export default function ConversationsTab() {
   }
   const location = useLocation()
   const navigate = useNavigate()
-  // 학생 탭에서 대화를 눌러 왔으면 그 대화를 바로 연다 (state.open = 대화 번호)
-  const [selectedId, setSelectedId] = useState<number | null>(
-    () => (location.state as { open?: number } | null)?.open ?? null,
-  )
-  useEffect(() => {
-    if ((location.state as { open?: number } | null)?.open) navigate('.', { replace: true, state: null }) // 뒤로 가기 때 다시 열리지 않게
-  }, [location.state, navigate])
+  // 열린 대화는 주소(?chat=번호)에 둔다: 브라우저 뒤로 가기로 대화 목록에 돌아오고, 학생 탭에서 대화를 눌러 와도 같은 방식으로 열린다.
+  const [params] = useSearchParams()
+  const selectedId = Number(params.get('chat')) || null
+  // 대화방에서 목록으로: 목록에서 눌러 들어왔으면 기록을 한 칸 되돌리고(뒤로 가기와 같음), 아니면(학생 탭에서 왔거나 주소로 바로 들어옴) 이 기록을 목록으로 바꾼다
+  const closeThread = () => {
+    if ((location.state as { fromList?: boolean } | null)?.fromList) navigate(-1)
+    else navigate('.', { replace: true })
+  }
   const [starting, setStarting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const { show, setShow, shown, openCount, closedCount } = useStatusFilter(conversations) // 대화 중 / 종료된 대화
+  const { show, setShow, shown, openCount, closedCount, sortControl } = useStatusFilter(conversations) // 대화 중 / 종료된 대화
   const selected = conversations.find((c) => c.id === selectedId) ?? null
   const todoCount = useOpenTodoCount()
 
   // 403·404 를 받으면 안내를 남기고 목록으로 돌아온다 (명세 3.1)
   const leave = (message: string) => {
     setNotice(message)
-    setSelectedId(null)
+    navigate('.', { replace: true })
   }
   const select = (id: number) => {
     markSeen(id)
     setNotice(null)
-    setSelectedId(id)
+    navigate({ search: `?chat=${id}` }, { state: { fromList: true } })
   }
 
   if (selected) {
@@ -58,12 +60,12 @@ export default function ConversationsTab() {
         conversation={selected}
         onLeave={leave}
         onBack={() => {
-          setSelectedId(null)
+          closeThread()
           void refresh() // 보는 동안 읽은 것을 목록 숫자에 반영
         }}
         onDeleted={(id) => {
           remove(id)
-          setSelectedId(null)
+          closeThread()
           setNotice('대화를 삭제했습니다.')
         }}
       />
@@ -95,7 +97,7 @@ export default function ConversationsTab() {
       )}
       {loading && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}
-      {notice && <p className="alert" role="alert">{notice}</p>}
+      {notice && <p className="alert" role="alert" ref={revealRef}>{notice}</p>}
       {!loading && !error && conversations.length === 0 && (
         <div className="empty">
           <div className="big">▤</div>아직 대화가 없어요. 「＋ 새 대화」로 학부모와 대화를 시작하세요
@@ -104,7 +106,7 @@ export default function ConversationsTab() {
       {conversations.length > 0 && (
         <StatusFilter show={show} setShow={setShow} openCount={openCount} closedCount={closedCount}
           shownCount={shown.length}
-          openHint="왼쪽으로 밀면 대화를 종료하거나 삭제할 수 있어요." />
+          sort={sortControl} />
       )}
       <ConversationList
         conversations={shown}

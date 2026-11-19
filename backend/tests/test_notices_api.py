@@ -160,7 +160,7 @@ def test_교사와_학부모가_댓글을_달고_서로_본다(client, auth, ids
     for who in ("parent1", "parent2", "teacher1"):
         got = client.get(f"/notices/{n['id']}/comments", headers=auth(who)).json()
         assert [c["body"] for c in got] == ["준비물 있나요?", "물통만 챙겨 주세요"]
-        assert got[1]["author_name"].endswith("선생님") and got[0]["author_name"].endswith("학부모")
+        assert got[1]["author_name"].endswith("선생님") and got[0]["author_name"] == "박서연 학부모"  # 반에 연결된 아이가 없으면
     assert client.get("/notices", headers=auth("parent2")).json()[0]["comment_count"] == 2
 
 
@@ -192,3 +192,19 @@ def test_공지를_지우면_댓글도_지워진다(client, auth, engine, sent_t
     assert client.delete(f"/notices/{n['id']}", headers=auth("teacher1")).status_code == 204
     with engine.connect() as c:
         assert c.execute(text("SELECT count(*) FROM notice_comments")).scalar() == 0
+
+
+def test_댓글_작성자는_학부모_이름과_아이_이름으로_모든_화면에_같게(client, auth, ids, engine):
+    with engine.begin() as c:
+        for name in ("박지후", "박지민"):
+            c.execute(text("INSERT INTO students (teacher_id, name, parent_id) VALUES (:t, :n, :p)"),
+                      {"t": ids["teacher1"], "n": name, "p": ids["parent1"]})
+    try:
+        n = sent_notice(client, auth)
+        comment(client, auth, "parent1", n["id"], "질문")
+        for who in ("parent1", "parent2", "teacher1"):
+            got = client.get(f"/notices/{n['id']}/comments", headers=auth(who)).json()
+            assert got[0]["author_name"] == "박서연 (박지민, 박지후의 학부모)"
+    finally:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM students WHERE parent_id = :p"), {"p": ids["parent1"]})

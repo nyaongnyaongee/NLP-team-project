@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { listStartable, startConversation } from '../../api/conversations'
 import type { Conversation, Startable } from '../../api/types'
 import AddChild from './AddChild'
+import { parentLabel } from './chatTitle'
 import { useResource } from './useResource'
 
 const NONE: Startable[] = []
@@ -65,8 +66,8 @@ export default function StartConversation({
                 <span className="row-title">
                   {role === 'teacher' ? (
                     <span className="row-name">
-                      <b>{s.parent_name}</b>
-                      <span className="row-sub">{s.student_name} 부모</span>
+                      <b>{parentLabel(s).name}</b>
+                      {parentLabel(s).sub && <span className="row-sub">{parentLabel(s).sub}</span>}
                     </span>
                   ) : (
                     <>

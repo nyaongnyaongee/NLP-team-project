@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { createEvent } from '../../api/tasks'
-import { fromDateInput, kstDateKey } from './formatDate'
+import ManualTaskForm from './ManualTaskForm'
 import MonthCalendar from './MonthCalendar'
 import TaskItem from './TaskItem'
 import { useTaskList } from './useTaskList'
@@ -27,7 +27,9 @@ export default function CalendarTab() {
         )}
       </div>
       {adding && (
-        <AddEventForm
+        <ManualTaskForm
+          kind="event"
+          onSubmit={createEvent}
           onCancel={() => setAdding(false)}
           onAdded={(t) => {
             add(t)
@@ -43,68 +45,5 @@ export default function CalendarTab() {
         renderItem={(t) => <TaskItem key={t.id} task={t} variant="event" onUpdated={replace} onRemoved={remove} />}
       />
     </section>
-  )
-}
-
-function AddEventForm({
-  onCancel,
-  onAdded,
-}: {
-  onCancel: () => void
-  onAdded: (t: Awaited<ReturnType<typeof createEvent>>) => void
-}) {
-  const [title, setTitle] = useState('')
-  const [date, setDate] = useState(() => kstDateKey(new Date()) ?? '')
-  const [time, setTime] = useState('')
-  const [shared, setShared] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (title.trim() === '') {
-      setError('제목을 입력해 주세요')
-      return
-    }
-    // 시각을 비우면 그날 00:00 (화면에는 「종일」)
-    const dueAt = date === '' ? null : time === '' ? fromDateInput(date) : `${date}T${time}:00+09:00`
-    setBusy(true)
-    setError(null)
-    try {
-      onAdded(await createEvent({ title: title.trim(), due_at: dueAt, shared }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '등록하지 못했습니다')
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form className="manual-form" onSubmit={(e) => void onSubmit(e)}>
-      <label className="editor-label" htmlFor="event-title">일정</label>
-      <input id="event-title" value={title} maxLength={100} placeholder="예: 가을 운동회" onChange={(e) => setTitle(e.target.value)} />
-      <div className="form-row">
-        <div>
-          <label className="editor-label" htmlFor="event-date">날짜</label>
-          <input id="event-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div>
-          <label className="editor-label" htmlFor="event-time">시각 (선택)</label>
-          <input id="event-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        </div>
-      </div>
-      <label className="share-check">
-        <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} />
-        반 학부모 캘린더에도 보이기
-      </label>
-      {error && <p className="alert" role="alert">{error}</p>}
-      <div className="form-actions">
-        <button type="button" className="outline" onClick={onCancel} disabled={busy}>
-          취소
-        </button>
-        <button type="submit" className="primary" disabled={busy}>
-          등록
-        </button>
-      </div>
-    </form>
   )
 }
