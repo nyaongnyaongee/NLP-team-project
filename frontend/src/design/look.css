@@ -158,11 +158,6 @@
   font-weight: 650;
   padding: 10px 14px;
 }
-.example-chips button.wide {
-  flex-basis: 100%;
-  border-color: #bbd2fa;
-  padding: 13px 14px;
-}
 .example-chips button:hover {
   background: var(--light-blue);
 }

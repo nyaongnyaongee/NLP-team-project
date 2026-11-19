@@ -12,23 +12,18 @@ const NONE: Startable[] = []
 const MAX = 2000
 
 // 「예시로 체험하기」: 누르면 입력칸에 채워진다 (시연용). {child} = 고른 자녀 이름
-const EXAMPLES: { label: string; text: string; wide?: boolean }[] = [
+const EXAMPLES: { label: string; text: string }[] = [
   {
-    label: '결석 안내',
-    text: '선생님 안녕하세요. {child}가 어젯밤부터 열이 나서 오늘 병원에 들렀다가 오후에 등교하려고 합니다. 오전 수업 내용은 어떻게 챙기면 될까요?',
+    label: '체험학습 신청',
+    text: '선생님 안녕하세요. 다음 주 수요일, 목요일에 가족 여행이 있어서 {child} 교외체험학습을 신청하려고 합니다. 신청서는 언제까지 내면 될까요? 다녀와서 낼 보고서 양식도 함께 받을 수 있으면 좋겠습니다.',
   },
   {
-    label: '상담 요청',
-    text: '선생님, {child} 교우 관계 때문에 한번 상담을 받고 싶습니다. 다음 주 중에 편하신 시간을 알려 주시면 맞춰서 찾아뵙겠습니다.',
+    label: '조퇴 · 병원',
+    text: '선생님, {child}가 내일 오후 2시에 치과 예약이 있어서 5교시 마치고 조퇴하려고 합니다. 1시 50분쯤 교문 앞으로 데리러 가겠습니다.',
   },
   {
-    label: '유해표현 포함',
-    text: '아니 선생님 도대체 애를 어떻게 보시는 거예요? {child}가 또 다쳐서 왔는데 연락 한 통이 없네요. 이게 말이 됩니까? 오늘 안에 꼭 연락 주세요.',
-  },
-  {
-    label: '반복 민원 시연 · 앞자리·매일 칭찬 요구',
-    wide: true,
-    text: '선생님 몇 번을 말씀드려야 알아들으세요? {child} 자리 맨 앞으로 바꿔 달라고 했잖아요. 그리고 매일 칭찬 한마디씩 해서 알림장에 적어 주세요. 이번 주 금요일까지 안 바뀌면 교장실에 직접 가겠습니다.',
+    label: '항의 · 처벌 요구',
+    text: '선생님 몇 번을 말씀드려야 하나요? 현우가 또 {child}를 밀어서 무릎이 까졌는데 아직도 같은 모둠이에요? 도대체 애들을 어떻게 보시는 거예요. 현우 부모님 연락처 주시고 내일까지 자리 떨어뜨려 주세요. 안 되면 교육청에 민원 넣겠습니다.',
   },
 ]
 
@@ -130,7 +125,6 @@ export default function ParentCompose() {
                 <button
                   key={ex.label}
                   type="button"
-                  className={ex.wide ? 'wide' : ''}
                   onClick={() => setText(ex.text.replaceAll('{child}', childName))}
                 >
                   {ex.label}
