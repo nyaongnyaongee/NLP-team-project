@@ -5,6 +5,8 @@ import type { Notice } from '../../api/types'
 import { useNoticeSync } from '../../realtime/useNoticeSync'
 import { formatTime } from '../chat/formatTime'
 import { useResource } from '../chat/useResource'
+import FaqBoard from '../faq/FaqBoard'
+import BoardTabs from '../faq/BoardTabs'
 import NoticeComments from './NoticeComments'
 import NoticeView from './NoticeView'
 import { editedAfterSend } from './noticeEdited'
@@ -28,6 +30,7 @@ export default function ParentNotices() {
           index
           element={
             <div>
+              <BoardTabs base={BASE} active="notice" />
               <div className="eyebrow">CLASS NOTICE BOARD</div>
               <div className="notice-heading">
                 <h2>우리 반 공지사항</h2>
@@ -57,6 +60,15 @@ export default function ParentNotices() {
                   </div>
                 </article>
               ))}
+            </div>
+          }
+        />
+        <Route
+          path="faq"
+          element={
+            <div>
+              <BoardTabs base={BASE} active="faq" />
+              <FaqBoard editable={false} />
             </div>
           }
         />

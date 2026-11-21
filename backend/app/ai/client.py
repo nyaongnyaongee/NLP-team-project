@@ -4,6 +4,7 @@
 - 정제(A)     call_refine        prompts/refine_system.txt       · refine_schema.json
 - 답장 초안(B) call_draft_reply   prompts/draft_reply_system.txt  · draft_reply_schema.json
 - 공지 초안(B) call_draft_notice  prompts/draft_notice_system.txt · draft_notice_schema.json
+- Q&A 초안     call_draft_faq     prompts/draft_faq_system.txt    · draft_faq_schema.json
 - 할 일 · 일정(C) call_extract     prompts/extract_system.txt      · extract_schema.json
 - 신고 보고서(D) call_report      prompts/report_system.txt       · report_schema.json
 
@@ -30,6 +31,7 @@ def _load(name: str) -> tuple[str, dict]:
 SYSTEM_PROMPT, REFINE_SCHEMA = _load("refine")
 DRAFT_REPLY_PROMPT, DRAFT_REPLY_SCHEMA = _load("draft_reply")
 DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA = _load("draft_notice")
+DRAFT_FAQ_PROMPT, DRAFT_FAQ_SCHEMA = _load("draft_faq")
 EXTRACT_PROMPT, EXTRACT_SCHEMA = _load("extract")
 REPORT_PROMPT, REPORT_SCHEMA = _load("report")
 
@@ -82,6 +84,11 @@ def call_draft_reply(masked: str, **kw) -> ClaudeReply:
 def call_draft_notice(masked: str, **kw) -> ClaudeReply:
     """가린 공지 요점으로 공지 초안을 쓴다."""
     return call_json(DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA, masked, **kw)
+
+
+def call_draft_faq(masked: str, **kw) -> ClaudeReply:
+    """가린 메모(+ 대화)로 반 학부모 모두가 볼 Q&A 한 쌍을 쓴다."""
+    return call_json(DRAFT_FAQ_PROMPT, DRAFT_FAQ_SCHEMA, masked, **kw)
 
 
 def call_extract(masked: str, **kw) -> ClaudeReply:

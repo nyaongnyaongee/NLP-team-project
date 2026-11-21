@@ -79,6 +79,15 @@ UPGRADES = [
       body       TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )""",
+    # 자주 묻는 질문 (schema.sql 의 것과 같게)
+    """CREATE TABLE IF NOT EXISTS faqs (
+      id         BIGSERIAL PRIMARY KEY,
+      teacher_id BIGINT NOT NULL REFERENCES users(id),
+      question   TEXT NOT NULL,
+      answer     TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )""",
     # 학생 · 학생 메모 (schema.sql 의 것과 같게)
     """CREATE TABLE IF NOT EXISTS students (
       id         BIGSERIAL PRIMARY KEY,

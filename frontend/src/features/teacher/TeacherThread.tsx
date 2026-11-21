@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { closeConversation, deleteConversation, extractAgain } from '../../api/conversations'
 import { refineMessage, sendMessage } from '../../api/messages'
@@ -18,6 +19,7 @@ import { useResource } from '../chat/useResource'
 import { revealElement, revealRef } from '../chat/useReveal'
 import CandidatePanel from '../tasks/CandidatePanel'
 import ReplyDraftPanel, { DraftToggle } from './ReplyDraftPanel'
+import FaqEditor from '../faq/FaqEditor'
 import { MemoPanel, MemoToggle } from './StudentMemo'
 import { useStudentMemo } from './useStudentMemo'
 
@@ -81,6 +83,8 @@ export default function TeacherThread({
   const [actionError, setActionError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
   const [draftOpen, setDraftOpen] = useState(false) // 「AI 초안」 메모 칸
+  const [faqOpen, setFaqOpen] = useState(false) // 「Q&A」: 이 대화에서 나온 내용을 자주 묻는 질문으로 등록
+  const [faqSaved, setFaqSaved] = useState(false)
   const [memoOpen, setMemoOpen] = useState(false) // 학생 메모 칸
   const memo = useStudentMemo(conversation.student_id ?? null) // 「대화 종료」를 눌러 고르는 중 (뽑고 닫기 · 그냥 닫기)
   const busyRef = useRef(false) // 연타로 같은 동작이 두 번 나가는 것을 막는다
@@ -172,6 +176,18 @@ export default function TeacherThread({
           {conversation.student_id != null && (
             <MemoToggle open={memoOpen} onToggle={() => setMemoOpen((o) => !o)} />
           )}
+          <button
+            type="button"
+            className={`head-action faq-toggle${faqOpen ? ' on' : ''}`}
+            onClick={() => {
+              setFaqOpen((o) => !o)
+              setFaqSaved(false)
+            }}
+            aria-expanded={faqOpen}
+            title="이 대화 내용을 자주 묻는 질문(Q&A)으로 등록"
+          >
+            Q&A
+          </button>
           {closed ? (
             <span className="tag">종료됨</span>
           ) : (
@@ -194,6 +210,23 @@ export default function TeacherThread({
             취소
           </button>
         </div>
+      )}
+      {faqOpen && (
+        <div className="memo-panel faq-panel">
+          <FaqEditor
+            conversationId={conversation.id}
+            onSaved={() => {
+              setFaqOpen(false)
+              setFaqSaved(true)
+            }}
+            onCancel={() => setFaqOpen(false)}
+          />
+        </div>
+      )}
+      {faqSaved && (
+        <p className="info faq-saved" role="status">
+          자주 묻는 질문에 등록했어요. <Link to="/teacher/notices/faq">보러 가기 ›</Link>
+        </p>
       )}
       {conversation.student_id != null && memoOpen && <MemoPanel memo={memo} studentName={conversation.student_name} />}
 

@@ -3,6 +3,8 @@ import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-
 import { listNotices } from '../../api/notices'
 import type { Notice } from '../../api/types'
 import { useResource } from '../chat/useResource'
+import FaqBoard from '../faq/FaqBoard'
+import BoardTabs from '../faq/BoardTabs'
 import NoticeComments from './NoticeComments'
 import NoticeEditor from './NoticeEditor'
 import TeacherNoticeRow from './TeacherNoticeRow'
@@ -39,6 +41,7 @@ export default function TeacherNotices() {
           index
           element={
             <div>
+              <BoardTabs base={BASE} active="notice" />
               <div className="eyebrow">CLASS NOTICE BOARD</div>
               <div className="notice-heading">
                 <h2>우리 반 공지사항</h2>
@@ -59,6 +62,15 @@ export default function TeacherNotices() {
                   onConflict={onConflict}
                 />
               ))}
+            </div>
+          }
+        />
+        <Route
+          path="faq"
+          element={
+            <div>
+              <BoardTabs base={BASE} active="faq" />
+              <FaqBoard editable />
             </div>
           }
         />

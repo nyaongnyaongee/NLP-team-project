@@ -331,6 +331,52 @@ def notice_recipients(db: Session, teacher_id: int) -> list[int]:
     ).all()]
 
 
+# ---- 자주 묻는 질문 (Q&A)
+
+def create_faq(db: Session, teacher_id: int, question: str, answer: str):
+    row = db.execute(
+        text("INSERT INTO faqs (teacher_id, question, answer) VALUES (:t, :q, :a) RETURNING *"),
+        {"t": teacher_id, "q": question, "a": answer},
+    ).mappings().first()
+    db.commit()
+    return row
+
+
+def get_faq(db: Session, faq_id: int):
+    return db.execute(text("SELECT * FROM faqs WHERE id = :i"), {"i": faq_id}).mappings().first()
+
+
+def list_teacher_faqs(db: Session, teacher_id: int):
+    """교사 자기 Q&A, 최근 것부터."""
+    return db.execute(text("SELECT * FROM faqs WHERE teacher_id = :t ORDER BY created_at DESC, id DESC"),
+                      {"t": teacher_id}).mappings().all()
+
+
+def list_parent_faqs(db: Session, parent_id: int):
+    """학부모가 보는 Q&A: 공지와 같은 기준 (내 아이 담임 또는 대화가 있는 교사), 최근 것부터."""
+    return db.execute(
+        text("SELECT * FROM faqs WHERE teacher_id IN (SELECT teacher_id FROM students WHERE parent_id = :p "
+             "                                     UNION SELECT teacher_id FROM conversations WHERE parent_id = :p) "
+             "ORDER BY created_at DESC, id DESC"),
+        {"p": parent_id},
+    ).mappings().all()
+
+
+def update_faq(db: Session, faq_id: int, fields: dict) -> bool:
+    if not fields:
+        return True
+    sets = ", ".join(f"{k} = :{k}" for k in fields)
+    n = db.execute(text(f"UPDATE faqs SET {sets}, updated_at = now() WHERE id = :i"), {**fields, "i": faq_id}).rowcount
+    db.commit()
+    return n == 1
+
+
+def delete_faq(db: Session, faq_id: int) -> bool:
+    n = db.execute(text("DELETE FROM faqs WHERE id = :i"), {"i": faq_id}).rowcount
+    db.commit()
+    return n == 1
+
+
 # ---- 공지 댓글
 
 def list_notice_comments(db: Session, notice_id: int):
@@ -518,7 +564,7 @@ def link_child(db: Session, teacher_id: int, parent_id: int, name: str) -> int:
 
 def dev_reset(db: Session) -> list[int]:
     """메시지 · 할 일/일정 · 공지를 모두 지우고 대화를 처음 상태(열림, 추출 없음)로. 계정 · 대화 자체는 둔다. 대화 id 목록을 돌려준다."""
-    db.execute(text("TRUNCATE messages, tasks, notice_comments, notices RESTART IDENTITY"))
+    db.execute(text("TRUNCATE messages, tasks, notice_comments, notices, faqs RESTART IDENTITY"))
     db.execute(text("UPDATE conversations SET status = 'open', extract = NULL, report = NULL, reported_at = NULL, "
                     "teacher_deleted_at = NULL, parent_deleted_at = NULL, teacher_read_id = NULL, parent_read_id = NULL"))
     ids = [r[0] for r in db.execute(text("SELECT id FROM conversations ORDER BY id")).all()]
