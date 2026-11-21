@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { makeNoticeDraft } from '../../api/drafts'
 import { createNotice, sendNotice } from '../../api/notices'
 import DraftChecks from '../drafts/DraftChecks'
@@ -9,7 +9,7 @@ const TITLE_MAX = 100
 const BODY_MAX = 5000
 const len = (s: string) => [...s].length
 
-// 대화창에서 공지 만들기: 열자마자 그 대화를 보고 공지 초안(제목 · 본문)을 채운다. 요점은 다시 만들 때 방향을 주는 선택 칸.
+// 대화창에서 공지 만들기: 「대화 분석해서 만들기」를 누르면 그 대화를 보고 공지 초안(제목 · 본문)을 채운다. 요점은 방향을 주는 선택 칸.
 // 교사가 읽고 고쳐서 [게시](반 학부모 모두에게 바로) 또는 [임시 저장](공지사항 탭에서 이어 쓰기).
 export default function ChatNoticeEditor({
   conversationId,
@@ -48,15 +48,6 @@ export default function ChatNoticeEditor({
     setChecks(result.check)
   }
 
-  // 열면 바로 한 번 만든다
-  const autoRef = useRef(false)
-  useEffect(() => {
-    if (autoRef.current) return
-    autoRef.current = true
-    void onMake()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   async function onSave(kind: 'sent' | 'draft') {
     if (problem || saving) return
     setSaving(kind)
@@ -88,7 +79,13 @@ export default function ChatNoticeEditor({
           disabled={draft.pending}
         />
         <button type="button" className="outline faq-make" onClick={() => void onMake()} disabled={draft.pending || pointsTooLong}>
-          {draft.pending ? (<><span className="spinner blue" />대화를 읽고 쓰는 중…</>) : '✦ 다시 만들기'}
+          {draft.pending ? (
+            <><span className="spinner blue" />대화를 읽고 쓰는 중…</>
+          ) : checks || draft.error ? (
+            '✦ 다시 분석하기'
+          ) : (
+            '✦ 대화 분석해서 만들기'
+          )}
         </button>
         {pointsTooLong && <p className="alert" role="alert">내용은 {POINTS_MAX}자까지 쓸 수 있어요</p>}
         {draft.error && <p className="alert" role="alert">{draft.error}</p>}

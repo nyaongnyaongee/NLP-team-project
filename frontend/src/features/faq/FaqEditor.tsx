@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { createFaq, makeFaqDraft, updateFaq } from '../../api/faqs'
 import type { Faq } from '../../api/types'
 import DraftChecks from '../drafts/DraftChecks'
@@ -10,7 +10,7 @@ const A_MAX = 3000
 const len = (s: string) => [...s].length // 서버(파이썬)와 같게 글자 단위
 
 // Q&A 쓰기 · 고치기. 새로 쓸 때는 위에 「메모 → AI 로 정리」 칸이 있다.
-// 대화창에서 열면(conversationId) 메모 없이 바로 그 대화를 보고 초안을 만든다. 메모는 다시 만들 때 방향을 주는 선택 칸.
+// 대화창에서 열면(conversationId) 「대화 분석해서 만들기」를 누를 때 그 대화를 보고 초안을 만든다 (메모는 방향을 주는 선택 칸).
 // AI 결과는 질문 · 답변 칸에 채워질 뿐이고, 교사가 읽고 [등록] 해야 학부모에게 보인다.
 export default function FaqEditor({
   faq = null,
@@ -52,15 +52,6 @@ export default function FaqEditor({
     setChecks(result.check)
   }
 
-  // 대화창에서 열면 바로 한 번 만든다 (교사가 내용을 적지 않아도 되게)
-  const autoRef = useRef(false)
-  useEffect(() => {
-    if (!fromChat || autoRef.current) return
-    autoRef.current = true
-    void onMake()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (problem || saving) return
@@ -101,7 +92,7 @@ export default function FaqEditor({
             {draft.pending ? (
               <><span className="spinner blue" />{fromChat ? '대화를 읽고 쓰는 중…' : '정리하는 중…'}</>
             ) : fromChat ? (
-              checks || draft.error ? '✦ 다시 만들기' : '✦ 대화 보고 만들기'
+              checks || draft.error ? '✦ 다시 분석하기' : '✦ 대화 분석해서 만들기'
             ) : (
               '✦ AI 로 질문 · 답변 만들기'
             )}
