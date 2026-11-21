@@ -7,7 +7,10 @@ export function makeReplyDraft(conversationId: number, memo?: string): Promise<R
   return request<ReplyDraft>(`/conversations/${conversationId}/draft`, { method: 'POST', json: memo ? { memo } : {} })
 }
 
-// 공지 초안. 오류: 502, 503
-export function makeNoticeDraft(points: string): Promise<NoticeDraft> {
-  return request<NoticeDraft>('/drafts/notice', { method: 'POST', json: { points } })
+// 공지 초안. 대화창에서는 conversationId 를 주면 요점 없이도 그 대화를 보고 쓴다. 오류: 409(대화에 내용 없음), 502, 503
+export function makeNoticeDraft(points: string, conversationId?: number): Promise<NoticeDraft> {
+  return request<NoticeDraft>('/drafts/notice', {
+    method: 'POST',
+    json: conversationId != null ? { points, conversation_id: conversationId } : { points },
+  })
 }

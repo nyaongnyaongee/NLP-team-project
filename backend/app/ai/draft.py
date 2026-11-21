@@ -103,18 +103,25 @@ def draft_notice(
     points: str,
     roster: list[str],
     adults: list[str],
+    history: list[dict] | None = None,
     *,
     call: Callable[[str], ClaudeReply] = call_draft_notice,
 ) -> dict:
-    """points: 교사가 적은 공지 요점 (자유 형식)."""
+    """points: 교사가 적은 공지 요점 (자유 형식). history: 대화창에서 만들 때 그 대화 (교사가 볼 수 있는 글만).
+    history 가 있으면 「[대화] … [담임 요점] …」 꼴로 보내고, 요점은 비어도 된다 (대화에서 반 전체에 알릴 것을 고른다)."""
     def failed(error: str) -> dict:
         return {"status": "failed", "title": None, "body": None, "check": [], "error": error}
 
+    history = history or []
     try:
-        masker, (masked,), mp = _mask_all([points.strip()], roster, adults)
+        masker, masked_all, mp = _mask_all([h["text"] for h in history] + [points.strip()], roster, adults)
     except Exception as e:
         log.exception("가명처리 실패")
         return failed(f"가명처리 실패 ({type(e).__name__})")
+    *masked_hist, masked = masked_all
+    if history:
+        lines = [f"{WHO[h['who']]}: {t}" for h, t in zip(history, masked_hist)]
+        masked = "[대화]\n" + "\n".join(lines) + "\n\n[담임 요점]\n" + (masked or "(없음)")
 
     parsed, error = call_and_parse(call, masked, log)
     if error:

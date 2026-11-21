@@ -586,3 +586,10 @@ input.invite-input,
   color: var(--primary-strong);
   font-weight: 650;
 }
+.share-kind {
+  display: inline-flex;
+  margin-bottom: 6px;
+}
+.faq-editor textarea.chat-notice-body {
+  min-height: 180px;
+}

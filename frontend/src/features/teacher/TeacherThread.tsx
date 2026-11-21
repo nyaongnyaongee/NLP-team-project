@@ -19,7 +19,7 @@ import { useResource } from '../chat/useResource'
 import { revealElement, revealRef } from '../chat/useReveal'
 import CandidatePanel from '../tasks/CandidatePanel'
 import ReplyDraftPanel, { DraftToggle } from './ReplyDraftPanel'
-import FaqEditor from '../faq/FaqEditor'
+import ShareFromChat, { type ShareResult } from './ShareFromChat'
 import { MemoPanel, MemoToggle } from './StudentMemo'
 import { useStudentMemo } from './useStudentMemo'
 
@@ -83,8 +83,8 @@ export default function TeacherThread({
   const [actionError, setActionError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
   const [draftOpen, setDraftOpen] = useState(false) // 「AI 초안」 메모 칸
-  const [faqOpen, setFaqOpen] = useState(false) // 「Q&A」: 이 대화에서 나온 내용을 자주 묻는 질문으로 등록
-  const [faqSaved, setFaqSaved] = useState(false)
+  const [faqOpen, setFaqOpen] = useState(false) // 「공지 · Q&A」: 이 대화에서 나온 내용을 자주 묻는 질문 · 공지로
+  const [shared, setShared] = useState<ShareResult | null>(null)
   const [memoOpen, setMemoOpen] = useState(false) // 학생 메모 칸
   const memo = useStudentMemo(conversation.student_id ?? null) // 「대화 종료」를 눌러 고르는 중 (뽑고 닫기 · 그냥 닫기)
   const busyRef = useRef(false) // 연타로 같은 동작이 두 번 나가는 것을 막는다
@@ -181,12 +181,12 @@ export default function TeacherThread({
             className={`head-action faq-toggle${faqOpen ? ' on' : ''}`}
             onClick={() => {
               setFaqOpen((o) => !o)
-              setFaqSaved(false)
+              setShared(null)
             }}
             aria-expanded={faqOpen}
-            title="이 대화 내용을 자주 묻는 질문(Q&A)으로 등록"
+            title="이 대화 내용으로 자주 묻는 질문 · 공지 만들기"
           >
-            Q&A
+            공지 · Q&A
           </button>
           {closed ? (
             <span className="tag">종료됨</span>
@@ -212,20 +212,19 @@ export default function TeacherThread({
         </div>
       )}
       {faqOpen && (
-        <div className="memo-panel faq-panel">
-          <FaqEditor
-            conversationId={conversation.id}
-            onSaved={() => {
-              setFaqOpen(false)
-              setFaqSaved(true)
-            }}
-            onCancel={() => setFaqOpen(false)}
-          />
-        </div>
+        <ShareFromChat
+          conversationId={conversation.id}
+          onDone={(r) => {
+            setFaqOpen(false)
+            setShared(r)
+          }}
+          onCancel={() => setFaqOpen(false)}
+        />
       )}
-      {faqSaved && (
+      {shared && (
         <p className="info faq-saved" role="status">
-          자주 묻는 질문에 등록했어요. <Link to="/teacher/notices/faq">보러 가기 ›</Link>
+          {shared === 'faq' ? '자주 묻는 질문에 등록했어요.' : shared === 'notice-sent' ? '공지를 게시했어요.' : '공지를 임시 저장했어요.'}{' '}
+          <Link to={shared === 'faq' ? '/teacher/notices/faq' : '/teacher/notices'}>보러 가기 ›</Link>
         </p>
       )}
       {conversation.student_id != null && memoOpen && <MemoPanel memo={memo} studentName={conversation.student_name} />}
