@@ -143,7 +143,8 @@ def draft_faq(
     *,
     call: Callable[[str], ClaudeReply] = call_draft_faq,
 ) -> dict:
-    """memo: 교사가 적은 짧은 메모 (무엇을 Q&A 로 남길지). history: 메모를 쓰게 된 대화 (교사가 볼 수 있는 글만, 없어도 됨).
+    """memo: 교사가 적은 짧은 메모 (무엇을 Q&A 로 남길지, 대화가 있으면 비어도 됨).
+    history: 메모를 쓰게 된 대화 (교사가 볼 수 있는 글만, 없어도 됨). 메모가 비면 대화에서 알아서 고른다.
     반 학부모 모두가 보므로 학생 · 학부모 이름이 남으면 check 에 알린다 (공지와 같음)."""
     def failed(error: str) -> dict:
         return {"status": "failed", "question": None, "answer": None, "check": [], "error": error}
@@ -155,7 +156,7 @@ def draft_faq(
         log.exception("가명처리 실패")
         return failed(f"가명처리 실패 ({type(e).__name__})")
     *masked_hist, masked_memo = masked
-    user = "[담임 메모]\n" + masked_memo
+    user = "[담임 메모]\n" + (masked_memo or "(없음)")
     if history:
         lines = [f"{WHO[h['who']]}: {t}" for h, t in zip(history, masked_hist)]
         user = "[대화]\n" + "\n".join(lines) + "\n\n" + user

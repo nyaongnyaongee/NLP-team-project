@@ -25,7 +25,7 @@ class FaqOut(BaseModel):
 
 
 class FaqDraftIn(BaseModel):
-    memo: str = Field(..., min_length=1, max_length=1000)  # 무엇을 Q&A 로 남길지 (짧게)
+    memo: str = Field("", max_length=1000)  # 무엇을 Q&A 로 남길지 (짧게). 대화창에서는 없어도 됨 (대화를 보고 알아서)
     conversation_id: int | None = None  # 대화창에서 만들면 그 대화도 참고한다 (교사가 볼 수 있는 글만)
 
 

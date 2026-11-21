@@ -127,3 +127,23 @@ def test_초안은_교사만_남의_대화는_안_됨(client, auth, ids, claude)
 def test_Claude_가_꺼져_있으면_503(client, auth, monkeypatch):
     monkeypatch.setitem(messages_router._refine_state, "enabled", False)
     assert client.post("/drafts/faq", json={"memo": "m"}, headers=auth("teacher1")).status_code == 503
+
+
+def test_대화창에서는_메모_없이_대화를_보고_만든다(client, auth, ids, engine, claude):
+    conv = ids["conv_parent1"]
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO messages (conversation_id, sender_id, raw_text, status, needs_refinement) "
+                       "VALUES (:c, :p, :r, 'done', false)"),
+                  {"c": conv, "p": ids["parent1"], "r": "체험학습 신청서는 언제까지 내면 되나요?"})
+    seen = claude(lambda s: reply({"question": "체험학습 신청서는 언제까지 내나요?", "answer": "[ ]까지 내 주세요.",
+                                   "check": ["담임 답이 아직 없어 [ ]로 비웠습니다"]}))
+    r = client.post("/drafts/faq", json={"conversation_id": conv}, headers=auth("teacher1"))
+    assert r.status_code == 200, r.text
+    assert seen[0].startswith("[대화]\n학부모: 체험학습 신청서는") and seen[0].endswith("[담임 메모]\n(없음)")
+
+
+def test_메모도_학부모_질문도_없으면_만들지_않는다(client, auth, ids, claude):
+    seen = claude(lambda s: reply({"question": "q", "answer": "a", "check": []}))
+    assert client.post("/drafts/faq", json={}, headers=auth("teacher1")).status_code == 422
+    r = client.post("/drafts/faq", json={"conversation_id": ids["conv_parent1"]}, headers=auth("teacher1"))
+    assert r.status_code == 409 and seen == []  # 빈 대화: Claude 를 부르지 않는다
