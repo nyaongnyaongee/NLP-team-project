@@ -46,7 +46,6 @@ export default function SortSelect({ control }: { control: SortControl }) {
       >
         <span>{current.label}</span>
         <span className="sort-arrow" aria-hidden="true">{arrow}</span>
-        <span className="sort-caret" aria-hidden="true">▾</span>
       </button>
       {open && (
         <ul className="sort-list" role="listbox" aria-label="정렬 기준">

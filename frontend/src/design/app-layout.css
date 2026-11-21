@@ -259,7 +259,7 @@ input.invite-input,
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 6px 8px;
 }
@@ -275,36 +275,38 @@ input.invite-input,
   flex: 1;
   min-width: 0;
 }
+.search-row {
+  margin: 14px 0 4px;
+}
+.search-row .student-search {
+  margin: 0;
+}
+.search-row .sort-trigger {
+  height: 40px; /* 학생 목록: 검색칸 높이에 맞춤 */
+}
 .sort-menu {
   position: relative;
   flex-shrink: 0;
   margin-left: auto;
 }
-.filter-row .sort-menu {
-  margin-top: 4px;
-}
+/* 옆 「진행 중 / 종료」 탭(.chips)과 같은 회색 · 같은 높이 */
 .sort-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 30px;
-  padding: 0 10px 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--white);
+  gap: 5px;
+  height: 37px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.12);
   color: var(--navy);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
 }
 .sort-arrow {
   color: var(--primary-strong);
   font-weight: 800;
-}
-.sort-caret {
-  margin-left: 2px;
-  font-size: 10px;
-  color: var(--secondary);
 }
 .sort-list {
   position: absolute;
