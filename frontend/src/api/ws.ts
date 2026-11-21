@@ -7,6 +7,7 @@ export type ServerEvent =
   | { type: 'notice'; noticeId: number | null } // 공지 게시 (시험용 초기화에서는 번호가 없다)
   | { type: 'events' } // 학부모: 선생님이 공유한 일정이 바뀜
   | { type: 'students' } // 교사: 초대 코드로 학부모 · 자녀가 반에 이어짐
+  | { type: 'faq' } // 자주 묻는 질문이 등록 · 수정 · 삭제됨
 
 export type SocketHandlers = {
   onReady: () => void
@@ -22,6 +23,7 @@ function parseEvent(data: unknown): ServerEvent | null {
   }
   if (msg.type === 'events') return { type: 'events' }
   if (msg.type === 'students') return { type: 'students' }
+  if (msg.type === 'faq') return { type: 'faq' }
   if (msg.type === 'notice') {
     return { type: 'notice', noticeId: typeof msg.notice_id === 'number' ? msg.notice_id : null }
   }

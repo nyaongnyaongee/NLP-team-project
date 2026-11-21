@@ -70,6 +70,18 @@ export type Task = {
 export type ReplyDraft = { draft: string; check: string[] } // check: 보내기 전에 교사가 확인할 것
 export type NoticeDraft = { title: string; body: string; check: string[] }
 
+// 자주 묻는 질문 (서버 schemas/faq.py)
+export type Faq = {
+  id: number
+  teacher_id: number
+  question: string // 1~200자
+  answer: string // 1~3000자
+  created_at: string
+  updated_at: string
+}
+
+export type FaqDraft = { question: string; answer: string; check: string[] }
+
 export type Notice = {
   id: number
   teacher_id: number

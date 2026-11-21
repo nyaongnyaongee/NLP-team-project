@@ -134,3 +134,22 @@ def test_공지_초안은_교사만(client, auth, claude):
     assert r.status_code == 200 and r.json()["title"] == "현장학습 안내"
     assert client.post("/drafts/notice", json={"points": "x"}, headers=auth("parent1")).status_code == 403
     assert client.post("/drafts/notice", json={"points": ""}, headers=auth("teacher1")).status_code == 422
+
+
+def test_대화창_공지_초안은_요점_없이_대화를_보고_만든다(client, auth, ids, engine, claude):
+    conv = ids["conv_parent1"]
+    put(engine, conv, ids["parent1"], "done", "준비물이 뭔가요?", "준비물이 무엇인지 알려 주세요.")
+    put(engine, conv, ids["teacher1"], "skip", "도시락과 물을 챙겨 주세요.")
+    seen = claude(lambda s: reply({"title": "현장학습 준비물 안내", "body": "도시락과 물을 챙겨 주세요.", "check": []}))
+    r = client.post("/drafts/notice", json={"conversation_id": conv}, headers=auth("teacher1"))
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "현장학습 준비물 안내"
+    assert seen[0].startswith("[대화]\n학부모: 준비물이 무엇인지 알려 주세요.\n교사: 도시락과 물을 챙겨 주세요.")
+    assert seen[0].endswith("[담임 요점]\n(없음)")
+
+
+def test_공지_초안은_요점도_대화도_없으면_만들지_않는다(client, auth, ids, claude):
+    seen = claude(lambda s: reply({"title": "t", "body": "b", "check": []}))
+    assert client.post("/drafts/notice", json={"points": "  "}, headers=auth("teacher1")).status_code == 422
+    r = client.post("/drafts/notice", json={"conversation_id": ids["conv_parent1"]}, headers=auth("teacher1"))
+    assert r.status_code == 409 and seen == []

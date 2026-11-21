@@ -4,6 +4,8 @@
     # {"status": "done" | "failed", "draft": str | None, "check": list[str], "error": str | None}
     result = draft_notice(points, roster, adults)
     # {"status": "done" | "failed", "title": str | None, "body": str | None, "check": list[str], "error": str | None}
+    result = draft_faq(memo, history, roster, adults)
+    # {"status": "done" | "failed", "question": str | None, "answer": str | None, "check": list[str], "error": str | None}
 
 정제(A)와 같은 틀: 명단으로 가명처리 → Claude → 검증(지어낸 이름) → 복원. DB 를 모르고 저장도 안 한다
 (초안은 교사가 고쳐서 보통 메시지로 보낸다).
@@ -17,7 +19,7 @@ from __future__ import annotations
 import logging
 from typing import Callable
 
-from app.ai.client import ClaudeReply, call_draft_notice, call_draft_reply
+from app.ai.client import ClaudeReply, call_draft_faq, call_draft_notice, call_draft_reply
 from app.ai.pii_mask import Mapping, PiiMasker
 from app.ai.refine import _mask_lock, call_and_parse, get_masker
 
@@ -46,6 +48,17 @@ def _invented_names(masker: PiiMasker, texts: list[str], mp: Mapping, masked_inp
 def _check_list(parsed: dict) -> list[str]:
     items = parsed.get("check") or []
     return [c for c in items if isinstance(c, str) and c.strip()][:MAX_CHECK]
+
+
+def _warn_student_names(check: list[str], mp: Mapping, roster: list[str], texts: list[str], note: str) -> None:
+    """반 전체가 보는 글(공지 · Q&A)에 학생 이름(가짜 이름)이 남았으면 check 에 알린다. 복원 전이라 {} 자리에 가짜 이름이 들어가고,
+    나중에 check 를 복원할 때 진짜 이름으로 바뀐다."""
+    students = set(roster)
+    for fake, orig in mp.fake2orig.items():
+        if mp.kinds.get(fake) == "NAME" and (orig in students or orig[1:] in students) and any(fake in t for t in texts):
+            line = note.format(fake)
+            if line not in check:
+                check.append(line)
 
 
 def draft_reply(
@@ -90,18 +103,25 @@ def draft_notice(
     points: str,
     roster: list[str],
     adults: list[str],
+    history: list[dict] | None = None,
     *,
     call: Callable[[str], ClaudeReply] = call_draft_notice,
 ) -> dict:
-    """points: 교사가 적은 공지 요점 (자유 형식)."""
+    """points: 교사가 적은 공지 요점 (자유 형식). history: 대화창에서 만들 때 그 대화 (교사가 볼 수 있는 글만).
+    history 가 있으면 「[대화] … [담임 요점] …」 꼴로 보내고, 요점은 비어도 된다 (대화에서 반 전체에 알릴 것을 고른다)."""
     def failed(error: str) -> dict:
         return {"status": "failed", "title": None, "body": None, "check": [], "error": error}
 
+    history = history or []
     try:
-        masker, (masked,), mp = _mask_all([points.strip()], roster, adults)
+        masker, masked_all, mp = _mask_all([h["text"] for h in history] + [points.strip()], roster, adults)
     except Exception as e:
         log.exception("가명처리 실패")
         return failed(f"가명처리 실패 ({type(e).__name__})")
+    *masked_hist, masked = masked_all
+    if history:
+        lines = [f"{WHO[h['who']]}: {t}" for h, t in zip(history, masked_hist)]
+        masked = "[대화]\n" + "\n".join(lines) + "\n\n[담임 요점]\n" + (masked or "(없음)")
 
     parsed, error = call_and_parse(call, masked, log)
     if error:
@@ -115,13 +135,57 @@ def draft_notice(
         return failed("검증 실패: " + " / ".join(problems))
 
     # 반 전체가 받는 공지에 학생 이름이 남았으면 (프롬프트가 빼라고 했어도) 교사에게 꼭 알린다
-    students = set(roster)
-    for fake, orig in mp.fake2orig.items():
-        if mp.kinds.get(fake) == "NAME" and (orig in students or orig[1:] in students) and (fake in title or fake in body):
-            note = f"공지에 학생 이름({fake})이 들어 있습니다. 빼고 보내세요"
-            if note not in check:
-                check.append(note)
+    _warn_student_names(check, mp, roster, [title, body], "공지에 학생 이름({})이 들어 있습니다. 빼고 보내세요")
 
     un = PiiMasker.unmask
     return {"status": "done", "title": un(title, mp).strip(), "body": un(body, mp).strip(),
+            "check": [un(c, mp) for c in check], "error": None}
+
+
+def draft_faq(
+    memo: str,
+    history: list[dict] | None,
+    roster: list[str],
+    adults: list[str],
+    *,
+    call: Callable[[str], ClaudeReply] = call_draft_faq,
+) -> dict:
+    """memo: 교사가 적은 짧은 메모 (무엇을 Q&A 로 남길지, 대화가 있으면 비어도 됨).
+    history: 메모를 쓰게 된 대화 (교사가 볼 수 있는 글만, 없어도 됨). 메모가 비면 대화에서 알아서 고른다.
+    반 학부모 모두가 보므로 학생 · 학부모 이름이 남으면 check 에 알린다 (공지와 같음)."""
+    def failed(error: str) -> dict:
+        return {"status": "failed", "question": None, "answer": None, "check": [], "error": error}
+
+    history = history or []
+    try:
+        masker, masked, mp = _mask_all([h["text"] for h in history] + [memo.strip()], roster, adults)
+    except Exception as e:
+        log.exception("가명처리 실패")
+        return failed(f"가명처리 실패 ({type(e).__name__})")
+    *masked_hist, masked_memo = masked
+    user = "[담임 메모]\n" + (masked_memo or "(없음)")
+    if history:
+        lines = [f"{WHO[h['who']]}: {t}" for h, t in zip(history, masked_hist)]
+        user = "[대화]\n" + "\n".join(lines) + "\n\n" + user
+
+    parsed, error = call_and_parse(call, user, log)
+    if error:
+        return failed(error)
+    question, answer = parsed.get("question"), parsed.get("answer")
+    if not isinstance(question, str) or not question.strip() or not isinstance(answer, str) or not answer.strip():
+        return failed("검증 실패: 질문이나 답변이 비어 있음")
+    check = _check_list(parsed)
+    problems = _invented_names(masker, [question, answer, *check], mp, user)
+    if problems:
+        return failed("검증 실패: " + " / ".join(problems))
+    _warn_student_names(check, mp, roster, [question, answer], "Q&A 에 학생 이름({})이 들어 있습니다. 빼고 등록하세요")
+    # 학부모 · 교사 이름도 모두에게 보이면 안 된다
+    for fake, orig in mp.fake2orig.items():
+        if mp.kinds.get(fake) == "NAME" and orig in adults and (fake in question or fake in answer):
+            line = f"Q&A 에 어른 이름({fake})이 들어 있습니다. 빼고 등록하세요"
+            if line not in check:
+                check.append(line)
+
+    un = PiiMasker.unmask
+    return {"status": "done", "question": un(question, mp).strip(), "answer": un(answer, mp).strip(),
             "check": [un(c, mp) for c in check], "error": None}

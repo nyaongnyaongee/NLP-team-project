@@ -93,6 +93,16 @@ CREATE TABLE notice_comments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 자주 묻는 질문(Q&A): 교사가 등록하면 바로 반 학부모(공지와 같은 받는 사람)에게 보인다. 학생 · 학부모 이름은 넣지 않는다
+CREATE TABLE faqs (
+  id         BIGSERIAL PRIMARY KEY,
+  teacher_id BIGINT NOT NULL REFERENCES users(id),
+  question   TEXT NOT NULL,
+  answer     TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 학생 메모장: 학생 한 명에 메모장 하나 (담임이 자유롭게 적는 글 한 덩어리). 학부모 · 민원대응팀 · Claude 에게는 주지 않는다
 CREATE TABLE student_memos (
   student_id BIGINT NOT NULL REFERENCES students(id),

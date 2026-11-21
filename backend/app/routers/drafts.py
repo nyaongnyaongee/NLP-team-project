@@ -26,7 +26,8 @@ class ReplyDraftOut(BaseModel):
 
 
 class NoticeDraftIn(BaseModel):
-    points: str = Field(..., min_length=1, max_length=2000)
+    points: str = Field("", max_length=2000)  # 공지 요점. 대화창에서는 없어도 됨 (대화를 보고 알아서)
+    conversation_id: int | None = None  # 대화창에서 만들면 그 대화(교사가 볼 수 있는 글)도 참고한다
 
 
 class NoticeDraftOut(BaseModel):
@@ -80,13 +81,24 @@ def make_reply_draft(conv_id: int, body: ReplyDraftIn, db: Session = Depends(get
 
 @router.post("/drafts/notice", response_model=NoticeDraftOut)
 def make_notice_draft(body: NoticeDraftIn, db: Session = Depends(get_db), user=Depends(current_user)):
-    """공지 초안. 공지 테이블은 아직 없어서 초안만 돌려준다."""
+    """공지 초안 (저장하지 않음). conversation_id 를 주면 그 대화도 참고하고, 그때는 요점이 없어도 된다
+    (대화에서 반 전체가 알아야 할 내용을 골라 쓴다)."""
     _need_teacher(user)
+    points = body.points.strip()
+    if not points and body.conversation_id is None:
+        raise HTTPException(422, "공지에 담을 내용을 입력해 주세요")
+    history, student = None, None
+    if body.conversation_id is not None:
+        conv = messages_router._my_conversation(db, body.conversation_id, user)
+        history = _history(crud.list_messages(db, conv["id"]), conv["parent_id"])
+        student = conv["student_name"]
+        if not points and not history:
+            raise HTTPException(409, "공지로 만들 대화 내용이 아직 없습니다 (내용을 적어 주세요)")
     _need_claude()
     adults = crud.adult_names(db)
-    roster = class_roster(crud.student_names(db, user["id"]))
+    roster = class_roster(crud.student_names(db, user["id"]), student)
     db.close()
-    result = draft_notice(body.points, roster, adults)
+    result = draft_notice(points, roster, adults, history)
     if result["status"] != "done":
         raise HTTPException(502, "초안을 만들지 못했습니다: " + result["error"])
     return {"title": result["title"], "body": result["body"], "check": result["check"]}
