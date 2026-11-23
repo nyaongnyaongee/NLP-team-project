@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { createFaq, makeFaqDraft, updateFaq } from '../../api/faqs'
 import type { Faq } from '../../api/types'
+import ChatSourcePicker from './ChatSourcePicker'
 import DraftChecks from '../drafts/DraftChecks'
 import { useDraftRequest } from '../drafts/useDraftRequest'
 
@@ -9,9 +10,6 @@ const Q_MAX = 200
 const A_MAX = 3000
 const len = (s: string) => [...s].length // 서버(파이썬)와 같게 글자 단위
 
-// Q&A 쓰기 · 고치기. 새로 쓸 때는 위에 「메모 → AI 로 정리」 칸이 있다.
-// 대화창에서 열면(conversationId) 「대화 분석해서 만들기」를 누를 때 그 대화를 보고 초안을 만든다 (메모는 방향을 주는 선택 칸).
-// AI 결과는 질문 · 답변 칸에 채워질 뿐이고, 교사가 읽고 [등록] 해야 학부모에게 보인다.
 export default function FaqEditor({
   faq = null,
   conversationId,
@@ -30,8 +28,12 @@ export default function FaqEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const draft = useDraftRequest()
+  // 공지사항 탭(대화창 밖)에서 새로 쓸 때만 대화를 고를 수 있다
+  const canPick = conversationId == null && !faq
+  const [pickedId, setPickedId] = useState<number | null>(null)
 
-  const fromChat = conversationId != null && !faq
+  const sourceId = conversationId ?? pickedId ?? undefined
+  const fromChat = sourceId != null && !faq
   const memoTooLong = len(memo) > MEMO_MAX
   const canMake = !memoTooLong && (fromChat || memo.trim() !== '')
   const problem =
@@ -45,7 +47,7 @@ export default function FaqEditor({
 
   async function onMake() {
     if (!canMake) return
-    const result = await draft.run(() => makeFaqDraft(memo.trim(), conversationId))
+    const result = await draft.run(() => makeFaqDraft(memo.trim(), sourceId))
     if (!result) return
     setQuestion(result.question)
     setAnswer(result.answer)
@@ -71,6 +73,16 @@ export default function FaqEditor({
     <form className="faq-editor" onSubmit={onSubmit}>
       {!faq && (
         <div className="faq-memo">
+          {canPick && (
+            <ChatSourcePicker
+              value={pickedId}
+              onChange={(id) => {
+                setPickedId(id)
+                setChecks(null)
+              }}
+              disabled={draft.pending}
+            />
+          )}
           <label className="editor-label" htmlFor="faq-memo">
             {fromChat ? '꼭 담을 내용 (선택)' : '어떤 내용을 Q&A 로 남길까요?'}
           </label>
