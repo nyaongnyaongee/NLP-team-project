@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Scenario } from './scenarios'
+import { heatLabel, type Scenario } from './scenarios'
 
 // 학부모 「메시지 작성」 위에 뜨는 역할 카드. compact 면 입장 화면용 짧은 모양 (상황까지만).
 export default function ScenarioCard({ scenario, compact = false, onClose, closeLabel = '카드 닫기' }: {
@@ -18,7 +18,7 @@ export default function ScenarioCard({ scenario, compact = false, onClose, close
         <span className="scenario-emoji" aria-hidden="true">{scenario.emoji}</span>
         <div>
           <h3>{scenario.title}</h3>
-          <small>분노 게이지 {scenario.heat}</small>
+          <small>{heatLabel(scenario).level} {heatLabel(scenario).fire}</small>
         </div>
         {onClose && (
           <button type="button" className="link-button scenario-close" onClick={onClose}>

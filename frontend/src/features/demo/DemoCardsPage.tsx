@@ -7,7 +7,7 @@ import { SCENARIOS } from './scenarios'
 
 const NONE = { code: '' }
 
-// 교사용: 시연 QR 포스터 한 장. QR = /join?code=<반 코드>&demo=1 → 이름을 적고 들어와 학부모 화면에서 상황 6개 중 하나를 고른다.
+// 교사용: 시연 QR 포스터 한 장. QR = /join?code=<반 코드>&demo=1 → 이름을 적고 들어와 학부모 화면에서 상황 하나를 고른다.
 // 주소는 지금 이 화면의 주소 그대로라, 폰이 열 수 있는 주소(시연 공개 주소)로 들어와 있어야 한다.
 export default function DemoCardsPage() {
   const load = useCallback(() => getInviteCode(), [])

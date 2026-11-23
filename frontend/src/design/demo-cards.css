@@ -342,3 +342,32 @@
 .scenario-hint {
   white-space: pre-line;
 }
+
+/* 고르기 화면: 맵기 이름표 (순한맛 · 중간맛 · 매운맛 · 지옥맛) */
+.scenario-level {
+  align-self: flex-start;
+  margin: -8px 0 0 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+  background: #eef6ee;
+  color: #2f7a43;
+}
+.heat-3 .scenario-level,
+.heat-ramp .scenario-level {
+  background: #fff4dc;
+  color: #a06a00;
+}
+.heat-4 .scenario-level {
+  background: #ffe9dc;
+  color: #c0521a;
+}
+.heat-5 .scenario-level {
+  background: #ffe3e3;
+  color: #b3261e;
+}
+/* 카드 수가 홀수면 마지막 한 장은 가로로 꽉 */
+.scenario-choice:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
