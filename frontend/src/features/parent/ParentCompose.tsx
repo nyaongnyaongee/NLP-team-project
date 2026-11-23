@@ -8,7 +8,8 @@ import { SCHOOL_NAME } from '../../components/AppShell'
 import AddChild from '../chat/AddChild'
 import { useResource } from '../chat/useResource'
 import ScenarioCard from '../demo/ScenarioCard'
-import { findScenario, loadScenarioId, saveScenarioId } from '../demo/scenarios'
+import ScenarioPicker from '../demo/ScenarioPicker'
+import { PICK, findScenario, loadScenarioId, saveScenarioId } from '../demo/scenarios'
 
 const NONE: Startable[] = []
 const MAX = 2000
@@ -46,7 +47,13 @@ export default function ParentCompose() {
   const textRef = useRef<HTMLTextAreaElement>(null)
   const [busy, setBusy] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [scenario, setScenario] = useState(() => findScenario(loadScenarioId())) // 시연 역할 카드 (QR 로 들어왔을 때)
+  // 시연 역할 카드 (시연 QR 로 들어왔을 때): null = 시연 아님, PICK = 아직 안 고름, 그 밖 = 고른 카드
+  const [demoId, setDemoId] = useState(() => loadScenarioId())
+  const scenario = findScenario(demoId)
+  function pickScenario(id: string) {
+    saveScenarioId(id)
+    setDemoId(id)
+  }
 
   const picked = kids.find((k) => k.student_id === pickedId) ?? kids[0] ?? null
   const given = picked ? picked.student_name.replace(/^[가-힣](?=[가-힣]{2}$)/, '') : '아이' // 박지민 → 지민
@@ -91,15 +98,9 @@ export default function ParentCompose() {
       </h2>
       <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
 
+      {demoId !== null && !scenario && <ScenarioPicker onPick={pickScenario} />}
       {scenario && (
-        <ScenarioCard
-          key={scenario.id}
-          scenario={scenario}
-          onClose={() => {
-            saveScenarioId(null)
-            setScenario(null)
-          }}
-        />
+        <ScenarioCard key={scenario.id} scenario={scenario} closeLabel="다른 상황 고르기" onClose={() => pickScenario(PICK)} />
       )}
 
       {!loaded && !error && <p className="loading">불러오는 중</p>}

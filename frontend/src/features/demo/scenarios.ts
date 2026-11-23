@@ -94,6 +94,8 @@ export function findScenario(id: string | null | undefined): Scenario | null {
 }
 
 const KEY = 'ieum.demoCard'
+// 시연 QR 로 들어왔지만 아직 상황을 안 고른 상태 (학부모 화면에 「상황 고르기」가 뜬다)
+export const PICK = 'pick'
 
 export function loadScenarioId(): string | null {
   try {

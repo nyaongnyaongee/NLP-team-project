@@ -2,10 +2,11 @@ import { useState } from 'react'
 import type { Scenario } from './scenarios'
 
 // 학부모 「메시지 작성」 위에 뜨는 역할 카드. compact 면 입장 화면용 짧은 모양 (상황까지만).
-export default function ScenarioCard({ scenario, compact = false, onClose }: {
+export default function ScenarioCard({ scenario, compact = false, onClose, closeLabel = '카드 닫기' }: {
   scenario: Scenario
   compact?: boolean
   onClose?: () => void
+  closeLabel?: string
 }) {
   const [done, setDone] = useState<boolean[]>(() => scenario.missions.map(() => false))
   const [showHint, setShowHint] = useState(false)
@@ -21,7 +22,7 @@ export default function ScenarioCard({ scenario, compact = false, onClose }: {
         </div>
         {onClose && (
           <button type="button" className="link-button scenario-close" onClick={onClose}>
-            카드 닫기
+            {closeLabel}
           </button>
         )}
       </div>
