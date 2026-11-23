@@ -19,7 +19,7 @@ export default function JoinPage() {
   const demo = scenario !== null || params.get('demo') === '1'
   // 시연 QR 로 들어오면 이 탭에 기억한다 (처음 그릴 때 한 번). 카드가 없으면 학부모 화면에서 고르게
   useState(() => {
-    if (demo) saveScenarioId(scenario ? scenario.id : PICK)
+    saveScenarioId(demo ? (scenario ? scenario.id : PICK) : null) // 시연이 아니면 예전 카드를 지운다
   })
   const [code, setCode] = useState(() => params.get('code') ?? '')
   const [studentName, setStudentName] = useState('')

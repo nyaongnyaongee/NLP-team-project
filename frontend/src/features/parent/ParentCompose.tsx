@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { listStartable, startConversation } from '../../api/conversations'
 import { sendMessage } from '../../api/messages'
 import type { Startable } from '../../api/types'
@@ -8,7 +8,6 @@ import { SCHOOL_NAME } from '../../components/AppShell'
 import AddChild from '../chat/AddChild'
 import { useResource } from '../chat/useResource'
 import ScenarioCard from '../demo/ScenarioCard'
-import ScenarioPicker from '../demo/ScenarioPicker'
 import { PICK, findScenario, loadScenarioId, saveScenarioId } from '../demo/scenarios'
 
 const NONE: Startable[] = []
@@ -47,13 +46,9 @@ export default function ParentCompose() {
   const textRef = useRef<HTMLTextAreaElement>(null)
   const [busy, setBusy] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-  // 시연 역할 카드 (시연 QR 로 들어왔을 때): null = 시연 아님, PICK = 아직 안 고름, 그 밖 = 고른 카드
-  const [demoId, setDemoId] = useState(() => loadScenarioId())
+  // 시연 역할 카드 (시연 QR 로 들어왔을 때): null = 시연 아님, PICK = 아직 안 고름 → 상황 고르기 화면으로, 그 밖 = 고른 카드
+  const [demoId] = useState(() => loadScenarioId())
   const scenario = findScenario(demoId)
-  function pickScenario(id: string) {
-    saveScenarioId(id)
-    setDemoId(id)
-  }
 
   const picked = kids.find((k) => k.student_id === pickedId) ?? kids[0] ?? null
   const given = picked ? picked.student_name.replace(/^[가-힣](?=[가-힣]{2}$)/, '') : '아이' // 박지민 → 지민
@@ -89,6 +84,8 @@ export default function ParentCompose() {
     }
   }
 
+  if (demoId === PICK) return <Navigate to="/parent/pick" replace />
+
   return (
     <section className="compose-home">
       <h2 className="hero-title">
@@ -98,9 +95,16 @@ export default function ParentCompose() {
       </h2>
       <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
 
-      {demoId !== null && !scenario && <ScenarioPicker onPick={pickScenario} />}
       {scenario && (
-        <ScenarioCard key={scenario.id} scenario={scenario} closeLabel="다른 상황 고르기" onClose={() => pickScenario(PICK)} />
+        <ScenarioCard
+          key={scenario.id}
+          scenario={scenario}
+          closeLabel="다른 상황 고르기"
+          onClose={() => {
+            saveScenarioId(PICK)
+            navigate('/parent/pick')
+          }}
+        />
       )}
 
       {!loaded && !error && <p className="loading">불러오는 중</p>}

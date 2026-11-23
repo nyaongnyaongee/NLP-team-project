@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { joinWithCode, login as loginApi } from '../api/auth'
 import { setUnauthorizedHandler } from '../api/client'
+import { saveScenarioId } from '../features/demo/scenarios'
 import { clearSession, loadSession, saveSession, type Session } from './authStorage'
 
 type AuthValue = {
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (loginId: string, password: string) => {
     const res = await loginApi(loginId, password)
+    saveScenarioId(null) // 시연 역할 카드는 손님(시연 QR)만. 시험하다 남은 카드를 지운다
     const next: Session = { token: res.token, name: res.name, role: res.role }
     saveSession(next)
     setSession(next)
