@@ -7,6 +7,8 @@ import { useAuth } from '../../auth/AuthContext'
 import { SCHOOL_NAME } from '../../components/AppShell'
 import AddChild from '../chat/AddChild'
 import { useResource } from '../chat/useResource'
+import ScenarioCard from '../demo/ScenarioCard'
+import { findScenario, loadScenarioId, saveScenarioId } from '../demo/scenarios'
 
 const NONE: Startable[] = []
 const MAX = 2000
@@ -40,10 +42,11 @@ export default function ParentCompose() {
   const { data: kids, setData, loaded, error } = useResource(load, NONE)
   const [pickedId, setPickedId] = useState<number | null>(null)
   const [text, setText] = useState('')
-  const [showTemplates, setShowTemplates] = useState(true)
+  const [showTemplates, setShowTemplates] = useState(() => !loadScenarioId()) // 역할 카드가 있으면 틀은 접어 둔다
   const textRef = useRef<HTMLTextAreaElement>(null)
   const [busy, setBusy] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [scenario, setScenario] = useState(() => findScenario(loadScenarioId())) // 시연 역할 카드 (QR 로 들어왔을 때)
 
   const picked = kids.find((k) => k.student_id === pickedId) ?? kids[0] ?? null
   const given = picked ? picked.student_name.replace(/^[가-힣](?=[가-힣]{2}$)/, '') : '아이' // 박지민 → 지민
@@ -87,6 +90,17 @@ export default function ParentCompose() {
         이야기를 전해보세요.
       </h2>
       <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
+
+      {scenario && (
+        <ScenarioCard
+          key={scenario.id}
+          scenario={scenario}
+          onClose={() => {
+            saveScenarioId(null)
+            setScenario(null)
+          }}
+        />
+      )}
 
       {!loaded && !error && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}

@@ -1,0 +1,182 @@
+/* 시연 역할 카드: 학부모 「메시지 작성」 위 카드 · 입장 화면 카드 · 교사용 QR 포스터 */
+
+.scenario-card {
+  border: 1.5px solid #ffc9a8;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #fff6ef 0%, var(--white) 70%);
+  padding: 14px 16px 16px;
+  margin: 4px 0 18px;
+}
+.scenario-card.compact {
+  margin-bottom: 12px;
+}
+.scenario-intro {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #b4541c;
+}
+.scenario-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.scenario-emoji {
+  font-size: 34px;
+  line-height: 1;
+}
+.scenario-head h3 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: -0.3px;
+}
+.scenario-head small {
+  display: block;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.scenario-close {
+  margin-left: auto;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.scenario-situation {
+  margin: 0 0 6px;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.scenario-missions {
+  list-style: none;
+  margin: 12px 0 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--white);
+  border: 1px solid var(--border);
+}
+.scenario-missions li + li {
+  margin-top: 6px;
+}
+.scenario-missions label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.scenario-missions input {
+  margin-top: 4px;
+  accent-color: #e0702f;
+}
+.scenario-missions input:checked + span {
+  color: var(--secondary);
+  text-decoration: line-through;
+}
+.scenario-note {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--primary-strong);
+}
+.scenario-rule {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.scenario-rule b {
+  color: #b4541c;
+}
+.scenario-hint {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff1e7;
+  font-size: 14px;
+}
+
+/* 교사용 QR 포스터 */
+.demo-cards-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.demo-posters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.demo-poster {
+  border: 1.5px solid #ffc9a8;
+  border-radius: var(--radius);
+  background: var(--white);
+  padding: 14px 10px 12px;
+  text-align: center;
+}
+.demo-poster-emoji {
+  display: block;
+  font-size: 36px;
+  line-height: 1.1;
+}
+.demo-poster h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  letter-spacing: -0.3px;
+}
+.demo-poster-heat {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+.demo-poster img {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  image-rendering: pixelated;
+}
+.demo-poster small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--secondary);
+}
+
+/* 인쇄: 앱 틀을 숨기고 한 장에 카드 하나씩 크게 */
+@media print {
+  .top,
+  .bottom-nav,
+  nav,
+  .demo-cards-bar,
+  .demo-cards-page > h2,
+  .demo-cards-page > .sub {
+    display: none !important;
+  }
+  .stage,
+  .phone-shell,
+  .phone,
+  .content {
+    all: unset;
+    display: block;
+  }
+  .demo-posters {
+    display: block;
+  }
+  .demo-poster {
+    border: none;
+    break-after: page;
+    padding-top: 40mm;
+  }
+  .demo-poster-emoji {
+    font-size: 80px;
+  }
+  .demo-poster h3 {
+    font-size: 40px;
+  }
+  .demo-poster-heat {
+    font-size: 28px;
+  }
+  .demo-poster img {
+    max-width: 110mm;
+  }
+  .demo-poster small {
+    font-size: 18px;
+  }
+}
