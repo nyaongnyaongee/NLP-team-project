@@ -8,7 +8,8 @@ import { PICK, findScenario, saveScenarioId } from '../demo/scenarios'
 
 // 초대 코드로 시작하기 (시연: 가입 없이). QR 로 이 화면을 열고, 선생님께 받은 코드 + 자녀 이름 + 보호자 이름을 적으면
 // 학부모 계정이 생기고 자녀가 담임 반에 이어져 바로 학부모 화면으로 간다. 주소에 ?code= 가 있으면 코드를 채워 둔다.
-// 시연: ?demo=1 (시연 QR) 이면 들어온 뒤 학부모 화면에서 상황 6개 중 하나를 고른다. ?card=<id> 면 그 카드로 바로.
+// 시연: 초대 코드로 들어온 손님 학부모는 (로그인 화면 링크 · 일반 초대 QR · 시연 QR 모두) 들어온 뒤 상황 6개 중 하나를 고른다.
+// ?card=<id> 면 그 카드로 바로. ?demo=0 이면 상황 없이 그냥 학부모로.
 // 이미 들어와 있어도 입장 화면을 보여 줘서 새 학부모로 들어오거나(노트북 한 대로 시험할 때 새 탭 = 새 학부모),
 // 「지금 계정으로 계속하기」로 이어 갈 수 있다.
 export default function JoinPage() {
@@ -16,7 +17,7 @@ export default function JoinPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const scenario = findScenario(params.get('card'))
-  const demo = scenario !== null || params.get('demo') === '1'
+  const demo = scenario !== null || params.get('demo') !== '0'
   // 시연 QR 로 들어오면 이 탭에 기억한다 (처음 그릴 때 한 번). 카드가 없으면 학부모 화면에서 고르게
   useState(() => {
     saveScenarioId(demo ? (scenario ? scenario.id : PICK) : null) // 시연이 아니면 예전 카드를 지운다
