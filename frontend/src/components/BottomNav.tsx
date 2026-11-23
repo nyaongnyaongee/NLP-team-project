@@ -17,7 +17,7 @@ function NavButton({ item }: { item: NavItem }) {
       <span className="ico">{item.icon}</span>
       <span className="nav-label">
         {item.label}
-        {item.badge !== undefined && (
+        {item.badge !== undefined && item.badge > 0 && (
           <span className="badge" aria-label={`${item.badge}개`}>
             {item.badge > 99 ? '99+' : item.badge}
           </span>

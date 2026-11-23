@@ -1,0 +1,157 @@
+/* 대화 목록 첫 화면 정리: 인사 한 줄 · 숫자 띠 · 한 묶음 목록(가는 줄로 나눔). look.css 뒤에 읽는다 (빼면 그 전 모양). */
+
+/* ── 인사: 날짜 + 한 줄 */
+.home-dash {
+  margin: 4px 0 18px;
+}
+.home-date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--secondary);
+}
+.home-greet {
+  margin: 2px 0 0;
+  font-size: 22px;
+  line-height: 1.4;
+  font-weight: 750;
+  color: var(--navy);
+}
+
+/* ── 숫자 띠: 한 장 안에 두 칸, 가운데 가는 줄 */
+.stat-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.stat-strip button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  color: var(--secondary);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: left;
+}
+.stat-strip button + button {
+  border-left: 1px solid var(--border);
+}
+.stat-strip button:hover {
+  background: var(--light-blue);
+}
+.stat-strip strong {
+  font-size: 22px;
+  font-weight: 800;
+  color: #b7c2d3;
+}
+.stat-strip button.hot {
+  color: var(--navy);
+}
+.stat-strip button.hot strong {
+  color: var(--primary-strong);
+}
+
+/* ── 탭 · 정렬 · 새 대화 한 줄 */
+.filter-row {
+  margin-bottom: 10px;
+}
+.filter-row .sort-menu {
+  margin-left: auto;
+}
+.new-conv {
+  flex-shrink: 0;
+  height: 37px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.new-conv[aria-expanded='true'] {
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--navy);
+}
+.filter-row > .new-conv:only-child {
+  margin-left: auto;
+}
+
+/* ── 대화 목록: 카드 여러 장 대신 흰 묶음 하나, 줄 사이는 가는 선 */
+ul.conv-list {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+ul.conv-list:empty {
+  display: none;
+}
+.conv-list > li + li {
+  border-top: 1px solid #eef1f6;
+}
+.conv-list .swipe {
+  margin: 0;
+  border-radius: 0;
+}
+.conv-list .swipe-front {
+  background: var(--white);
+}
+.conv-list .row.row-card {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--white);
+  padding: 13px 14px;
+}
+.conv-list .row.row-card:hover {
+  background: #f7f9fd;
+}
+.conv-list .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 15px;
+}
+.conv-list .row-title b {
+  font-size: 16px;
+}
+.conv-list .row-sub {
+  font-size: 12px;
+}
+.conv-list .row-summary,
+.conv-list .row-last {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.conv-list .row-summary {
+  font-size: 14px;
+  font-weight: 600;
+}
+.conv-list .row-last {
+  font-size: 13px;
+}
+/* › 는 빼고(줄 전체가 눌림), ⋯ 자리는 그대로 */
+.conv-list .row-chevron {
+  display: none;
+}
+.conv-list .row-open {
+  padding-right: 18px;
+}
+.conv-list .swipe-actions {
+  padding: 6px 6px 6px 8px;
+}

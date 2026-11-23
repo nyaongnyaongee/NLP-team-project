@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import SortSelect, { type SortControl } from './SortSelect'
 import type { ConversationStatus } from './useStatusFilter'
 
@@ -9,6 +10,7 @@ export default function StatusFilter({
   closedCount,
   shownCount,
   sort,
+  extra,
 }: {
   show: ConversationStatus
   setShow: (s: ConversationStatus) => void
@@ -16,6 +18,7 @@ export default function StatusFilter({
   closedCount: number
   shownCount: number
   sort?: SortControl // 정렬 셀렉트 (useStatusFilter 의 sortControl)
+  extra?: ReactNode // 정렬 오른쪽에 붙는 단추 (교사 「＋ 새 대화」)
 }) {
   return (
     <>
@@ -39,6 +42,7 @@ export default function StatusFilter({
         </button>
       </div>
       {sort && <SortSelect control={sort} />}
+      {extra}
       </div>
       {shownCount === 0 && (
         <p className="info">{show === 'open' ? '진행 중인 대화가 없습니다.' : '종료된 대화가 없습니다.'}</p>
