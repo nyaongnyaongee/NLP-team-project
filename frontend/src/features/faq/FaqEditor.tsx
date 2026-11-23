@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { listConversations } from '../../api/conversations'
 import { createFaq, makeFaqDraft, updateFaq } from '../../api/faqs'
-import type { Faq } from '../../api/types'
+import type { Conversation, Faq } from '../../api/types'
+import { parentTitle } from '../chat/chatTitle'
 import DraftChecks from '../drafts/DraftChecks'
 import { useDraftRequest } from '../drafts/useDraftRequest'
 
@@ -9,8 +11,18 @@ const Q_MAX = 200
 const A_MAX = 3000
 const len = (s: string) => [...s].length // 서버(파이썬)와 같게 글자 단위
 
+// 고르기 칸 한 줄: 「11/21 · 박서연 (박지민의 학부모) · 체험학습 신청 문의」
+function convOption(c: Conversation): string {
+  const at = new Date(c.last_message_at ?? c.created_at)
+  const day = `${at.getMonth() + 1}/${at.getDate()}`
+  const summary = c.preview?.summary?.trim()
+  const short = summary && [...summary].length > 24 ? [...summary].slice(0, 24).join('') + '…' : summary
+  return [day, parentTitle(c), short].filter(Boolean).join(' · ')
+}
+
 // Q&A 쓰기 · 고치기. 새로 쓸 때는 위에 「메모 → AI 로 정리」 칸이 있다.
 // 대화창에서 열면(conversationId) 「대화 분석해서 만들기」를 누를 때 그 대화를 보고 초안을 만든다 (메모는 방향을 주는 선택 칸).
+// 공지사항 탭에서 새로 쓸 때는 「대화에서 가져오기」로 대화방을 골라 같은 방식으로 초안을 만들 수 있다.
 // AI 결과는 질문 · 답변 칸에 채워질 뿐이고, 교사가 읽고 [등록] 해야 학부모에게 보인다.
 export default function FaqEditor({
   faq = null,
@@ -30,8 +42,29 @@ export default function FaqEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const draft = useDraftRequest()
+  // 공지사항 탭(대화창 밖)에서 새로 쓸 때만 대화를 고를 수 있다
+  const canPick = conversationId == null && !faq
+  const [convs, setConvs] = useState<Conversation[] | null>(null)
+  const [convError, setConvError] = useState<string | null>(null)
+  const [pickedId, setPickedId] = useState<number | null>(null)
 
-  const fromChat = conversationId != null && !faq
+  useEffect(() => {
+    if (!canPick) return
+    let alive = true
+    listConversations()
+      .then((rows) => {
+        if (!alive) return
+        const t = (c: Conversation) => c.last_message_at ?? c.created_at
+        setConvs(rows.filter((c) => c.last_message_at).sort((a, b) => t(b).localeCompare(t(a))))
+      })
+      .catch((e) => alive && setConvError(e instanceof Error ? e.message : '대화 목록을 불러오지 못했습니다'))
+    return () => {
+      alive = false
+    }
+  }, [canPick])
+
+  const sourceId = conversationId ?? pickedId ?? undefined
+  const fromChat = sourceId != null && !faq
   const memoTooLong = len(memo) > MEMO_MAX
   const canMake = !memoTooLong && (fromChat || memo.trim() !== '')
   const problem =
@@ -45,7 +78,7 @@ export default function FaqEditor({
 
   async function onMake() {
     if (!canMake) return
-    const result = await draft.run(() => makeFaqDraft(memo.trim(), conversationId))
+    const result = await draft.run(() => makeFaqDraft(memo.trim(), sourceId))
     if (!result) return
     setQuestion(result.question)
     setAnswer(result.answer)
@@ -71,6 +104,31 @@ export default function FaqEditor({
     <form className="faq-editor" onSubmit={onSubmit}>
       {!faq && (
         <div className="faq-memo">
+          {canPick && (
+            <>
+              <label className="editor-label" htmlFor="faq-conv">
+                대화에서 가져오기 (선택)
+              </label>
+              <select
+                id="faq-conv"
+                className="notice-input faq-conv"
+                value={pickedId ?? ''}
+                onChange={(e) => {
+                  setPickedId(e.target.value === '' ? null : Number(e.target.value))
+                  setChecks(null)
+                }}
+                disabled={draft.pending || convs === null}
+              >
+                <option value="">{convs === null && !convError ? '대화 불러오는 중…' : '대화 없이 메모로 쓰기'}</option>
+                {convs?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {convOption(c)}
+                  </option>
+                ))}
+              </select>
+              {convError && <p className="alert" role="alert">{convError}</p>}
+            </>
+          )}
           <label className="editor-label" htmlFor="faq-memo">
             {fromChat ? '꼭 담을 내용 (선택)' : '어떤 내용을 Q&A 로 남길까요?'}
           </label>

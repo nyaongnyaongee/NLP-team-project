@@ -52,7 +52,7 @@ export default function FaqBoard({ editable }: { editable: boolean }) {
         )}
       </div>
       <p className="sub">
-        {editable ? '대화창의 「Q&A」 버튼으로도 바로 등록할 수 있어요.' : '선생님께 묻기 전에 먼저 찾아보세요.'}
+        {editable ? '＋ Q&A 추가에서 대화를 고르면 그 대화를 보고 초안을 써 줘요.' : '선생님께 묻기 전에 먼저 찾아보세요.'}
       </p>
       {adding && (
         <FaqEditor
