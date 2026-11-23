@@ -84,6 +84,33 @@ export default function ParentCompose() {
     }
   }
 
+  // 받는 선생님 카드: 시연 상황 카드가 있으면 작은 칩으로 상황 카드 위에, 없으면 원래 큰 카드로 아래에
+  const teacherCards = (
+    <div className={`teacher-cards${scenario ? ' compact' : ''}`} role={kids.length > 1 ? 'radiogroup' : undefined} aria-label="받는 선생님">
+      {kids.map((k) => {
+        const on = picked?.student_id === k.student_id
+        return (
+          <button
+            key={k.student_id}
+            type="button"
+            className={`teacher-card${on ? ' on' : ''}`}
+            role={kids.length > 1 ? 'radio' : undefined}
+            aria-checked={kids.length > 1 ? on : undefined}
+            onClick={() => setPickedId(k.student_id)}
+          >
+            <span className={`avatar${scenario ? '' : ' big'}`}>{k.teacher_name.slice(0, 1)}</span>
+            <span>
+              <b>{k.teacher_name} 선생님{scenario ? '께' : ''}</b>
+              <small>
+                {SCHOOL_NAME} · {k.student_name} 담임
+              </small>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
   if (demoId === PICK) return <Navigate to="/parent/pick" replace />
 
   return (
@@ -100,6 +127,7 @@ export default function ParentCompose() {
         </>
       )}
 
+      {scenario && teacherCards}
       {scenario && (
         <ScenarioCard
           key={scenario.id}
@@ -121,30 +149,7 @@ export default function ParentCompose() {
           담임 선생님께 받은 초대 코드로 자녀를 추가해 주세요.
         </div>
       )}
-      <div className={`teacher-cards${scenario ? ' compact' : ''}`} role={kids.length > 1 ? 'radiogroup' : undefined} aria-label="받는 선생님">
-        {kids.map((k) => {
-          const on = picked?.student_id === k.student_id
-          return (
-            <button
-              key={k.student_id}
-              type="button"
-              className={`teacher-card${on ? ' on' : ''}`}
-              role={kids.length > 1 ? 'radio' : undefined}
-              aria-checked={kids.length > 1 ? on : undefined}
-              onClick={() => setPickedId(k.student_id)}
-            >
-              <span className={`avatar${scenario ? '' : ' big'}`}>{k.teacher_name.slice(0, 1)}</span>
-              <span>
-                {scenario && <small className="teacher-to">받는 사람</small>}
-                <b>{k.teacher_name} 선생님</b>
-                <small>
-                  {SCHOOL_NAME} · {k.student_name} 담임
-                </small>
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      {!scenario && teacherCards}
       {loaded && !scenario && (
         <AddChild
           onAdded={(s) => {
