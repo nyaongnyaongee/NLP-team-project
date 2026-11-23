@@ -27,6 +27,21 @@ def put(engine, conv_id, sender_id, raw, *, refined=None, status="done", needs_r
              "status": status, "needs": needs_refinement}).scalar_one()
 
 
+@pytest.fixture
+def second_team(engine):
+    from app.core.auth import hash_password
+
+    with engine.begin() as c:
+        user_id = c.execute(text(
+            "INSERT INTO users (role, name, login_id, password_hash) "
+            "VALUES ('complaint_team', '두 번째 담당자', 'team2', :hash) RETURNING id"),
+            {"hash": hash_password("pw1234")}).scalar_one()
+    yield user_id
+    with engine.begin() as c:
+        c.execute(text("DELETE FROM complaint_case_chat_reads WHERE user_id = :id"), {"id": user_id})
+        c.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+
+
 def submit(client, auth, ids, conversation_ids=None, reason="여러 차례 무리한 요구가 이어져 업무가 어렵습니다."):
     return client.post("/complaints", headers=auth("teacher1"), json={
         "conversation_ids": conversation_ids or [ids["conv_parent1"]], "reason": reason})
@@ -147,7 +162,7 @@ def test_학부모와_교사_채팅은_역할별로_분리되고_완료되면_�
     parent_chats = client.get("/complaints/chats/parent", headers=auth("parent1")).json()
     assert parent_chats == [{"case_id": case_id, "channel": "parent", "status": "in_progress",
                              "counterpart_name": "민원 담당자", "last_message_at": first.json()["created_at"],
-                             "last_message_text": "안녕하세요. 상담을 도와드리겠습니다."}]
+                             "last_message_text": "안녕하세요. 상담을 도와드리겠습니다.", "unread_count": 1}]
     assert "reason" not in str(parent_chats) and "report" not in str(parent_chats)
     reply = client.post(parent_path, headers=auth("parent1"), json={"text": "네, 확인했습니다."})
     assert reply.status_code == 201
@@ -164,6 +179,62 @@ def test_학부모와_교사_채팅은_역할별로_분리되고_완료되면_�
     assert client.get("/complaints/chats/teacher", headers=auth("team1")).json()[0]["status"] == "completed"
     assert client.post(parent_path, headers=auth("team1"), json={"text": "완료 후 글"}).status_code == 409
     assert client.post(teacher_path, headers=auth("teacher1"), json={"text": "완료 후 글"}).status_code == 409
+
+
+def test_담당자_채팅_읽지_않은_상대_메시지는_채널별_사용자별로_센다(client, auth, ids, engine, second_team):
+    put(engine, ids["conv_parent1"], ids["parent1"], "이관할 문의", needs_refinement=False)
+    case_id = submit(client, auth, ids).json()["id"]
+    client.get(f"/complaints/{case_id}", headers=auth("team1"))
+    parent_path = f"/complaints/{case_id}/chats/parent"
+    teacher_path = f"/complaints/{case_id}/chats/teacher"
+
+    team_message = client.post(parent_path + "/messages", headers=auth("team1"),
+                               json={"text": "학부모님께 연락드립니다"}).json()
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 0
+    assert client.get("/complaints/chats/parent", headers=auth("parent1")).json()[0]["unread_count"] == 1
+
+    first_parent = client.post(parent_path + "/messages", headers=auth("parent1"),
+                               json={"text": "첫 답장"}).json()
+    second_parent = client.post(parent_path + "/messages", headers=auth("parent1"),
+                                json={"text": "두 번째 답장"}).json()
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 2
+    assert client.get("/complaints/chats/parent", headers=auth("team2")).json()[0]["unread_count"] == 2
+    assert client.get("/complaints/chats/teacher", headers=auth("team1")).json()[0]["unread_count"] == 0
+    assert client.get("/complaints/chats/parent", headers=auth("parent1")).json()[0]["unread_count"] == 1
+    assert len(client.get(parent_path + "/messages", headers=auth("team1")).json()) == 3
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 2
+
+    read = parent_path + "/read"
+    assert client.post(read, headers=auth("team1"), json={"message_id": first_parent["id"]}).status_code == 204
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 1
+    # 오래된 읽음 요청이 늦게 와도 커서는 뒤로 가지 않는다.
+    assert client.post(read, headers=auth("team1"), json={"message_id": team_message["id"]}).status_code == 204
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 1
+    assert client.post(read, headers=auth("team1"), json={"message_id": second_parent["id"]}).status_code == 204
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 0
+    assert client.get("/complaints/chats/parent", headers=auth("team2")).json()[0]["unread_count"] == 2
+
+    assert client.post(read, headers=auth("parent1"), json={"message_id": team_message["id"]}).status_code == 204
+    assert client.get("/complaints/chats/parent", headers=auth("parent1")).json()[0]["unread_count"] == 0
+    assert client.post(read, headers=auth("parent2"), json={"message_id": team_message["id"]}).status_code == 404
+    assert client.post(read, headers=auth("teacher1"), json={"message_id": team_message["id"]}).status_code == 404
+    assert client.post(read, headers=auth("team1"), json={"message_id": 999999}).status_code == 400
+
+    teacher_message = client.post(teacher_path + "/messages", headers=auth("teacher1"),
+                                  json={"text": "교사의 설명"}).json()
+    assert client.get("/complaints/chats/teacher", headers=auth("team1")).json()[0]["unread_count"] == 1
+    assert client.get("/complaints/chats/teacher", headers=auth("teacher1")).json()[0]["unread_count"] == 0
+    assert client.post(read, headers=auth("team1"), json={"message_id": teacher_message["id"]}).status_code == 400
+    assert client.post(teacher_path + "/read", headers=auth("team1"),
+                       json={"message_id": teacher_message["id"]}).status_code == 204
+    assert client.get("/complaints/chats/teacher", headers=auth("team1")).json()[0]["unread_count"] == 0
+
+    final_parent = client.post(parent_path + "/messages", headers=auth("parent1"),
+                               json={"text": "처리 전 마지막 메시지"}).json()
+    assert client.post(f"/complaints/{case_id}/complete", headers=auth("team1")).status_code == 200
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 1
+    assert client.post(read, headers=auth("team1"), json={"message_id": final_parent["id"]}).status_code == 204
+    assert client.get("/complaints/chats/parent", headers=auth("team1")).json()[0]["unread_count"] == 0
 
 
 def test_실패한_AI_보고서는_담당자만_다시_요청할_수_있다(client, auth, ids, engine):

@@ -138,6 +138,15 @@ UPGRADES = [
       body TEXT NOT NULL CHECK (length(btrim(body)) > 0),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )""",
+    """CREATE TABLE IF NOT EXISTS complaint_case_chat_reads (
+      case_id BIGINT NOT NULL REFERENCES complaint_cases(id) ON DELETE CASCADE,
+      channel TEXT NOT NULL CHECK (channel IN ('parent', 'teacher')),
+      user_id BIGINT NOT NULL REFERENCES users(id),
+      last_read_message_id BIGINT NOT NULL DEFAULT 0,
+      PRIMARY KEY (case_id, channel, user_id)
+    )""",
+    "CREATE INDEX IF NOT EXISTS complaint_case_chat_messages_thread_idx "
+    "ON complaint_case_chat_messages (case_id, channel, id)",
     """DO $$ BEGIN
       IF to_regclass('public.student_notes') IS NOT NULL THEN
         INSERT INTO student_memos (student_id, teacher_id, body, updated_at)

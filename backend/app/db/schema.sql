@@ -150,6 +150,17 @@ CREATE TABLE complaint_case_chat_messages (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 담당자·교사·학부모마다 채팅방의 마지막 읽은 메시지를 따로 기록한다.
+CREATE TABLE complaint_case_chat_reads (
+  case_id              BIGINT NOT NULL REFERENCES complaint_cases(id) ON DELETE CASCADE,
+  channel              TEXT NOT NULL CHECK (channel IN ('parent', 'teacher')),
+  user_id              BIGINT NOT NULL REFERENCES users(id),
+  last_read_message_id BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (case_id, channel, user_id)
+);
+CREATE INDEX complaint_case_chat_messages_thread_idx
+  ON complaint_case_chat_messages (case_id, channel, id);
+
 -- messages.analysis 예시 (확정 아님, 프롬프트에 따라 바뀜)
 -- {"abusive": true, "abuse_types": ["욕설", "협박"], "topic": "짝 바꾸기",
 --  "requests": ["짝을 바꿔 달라"], "deadline": "오늘까지", "quotes": ["몇번을 말해야 알아들어요?"]}

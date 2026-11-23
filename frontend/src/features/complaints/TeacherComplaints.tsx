@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { listComplaints, submitComplaint } from '../../api/complaints'
-import type { ComplaintCaseSummary, ComplaintStatus } from '../../api/types'
+import type { ComplaintCaseSummary, ComplaintChatSummary, ComplaintStatus } from '../../api/types'
 import { useSync } from '../../realtime/useSync'
 import { formatTime } from '../chat/formatTime'
 import { parentTitle } from '../chat/chatTitle'
@@ -16,7 +16,12 @@ const STATUS_LABEL: Record<ComplaintStatus, string> = {
 }
 const STATUSES: ComplaintStatus[] = ['received', 'in_progress', 'completed']
 
-export default function TeacherComplaints() {
+export default function TeacherComplaints({ chats, chatsLoaded, chatsError, refreshChats }: {
+  chats: ComplaintChatSummary[]
+  chatsLoaded: boolean
+  chatsError: string | null
+  refreshChats: () => void
+}) {
   const { conversations, loading: conversationsLoading, error: conversationsError } = useConversations()
   const { data: cases, setData: setCases, loaded, error, refresh } = useResource(listComplaints, EMPTY)
   useSync('teacher-complaints', refresh, (event) => event.type === 'complaints')
@@ -26,11 +31,16 @@ export default function TeacherComplaints() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successId, setSuccessId] = useState<number | null>(null)
   const [filter, setFilter] = useState<ComplaintStatus>('received')
-  const [chatCase, setChatCase] = useState<ComplaintCaseSummary | null>(null)
+  const [chatCase, setChatCase] = useState<{ id: number; status: Exclude<ComplaintStatus, 'received'> } | null>(null)
 
   const selectedParent = conversations.find((conversation) => selectedIds.includes(conversation.id))?.parent_id
   const choices = conversations.filter((conversation) => conversation.last_message_at)
   const filteredCases = cases.filter((complaint) => complaint.status === filter)
+  const unreadChats = chats.reduce((count, chat) => count + (chat.unread_count ?? 0), 0)
+  const sortedChats = [...chats].sort((a, b) => {
+    const unreadDifference = Number((b.unread_count ?? 0) > 0) - Number((a.unread_count ?? 0) > 0)
+    return unreadDifference || (b.last_message_at || '').localeCompare(a.last_message_at || '')
+  })
 
   function toggleConversation(id: number) {
     setSelectedIds((old) => old.includes(id) ? old.filter((value) => value !== id) : [...old, id])
@@ -66,20 +76,43 @@ export default function TeacherComplaints() {
     }
   }
 
-  if (chatCase && chatCase.status !== 'received') {
+  if (chatCase) {
     return (
       <ComplaintChatThread
         caseId={chatCase.id}
         channel="teacher"
         counterpartName="민원담당자"
-        status={cases.find((item) => item.id === chatCase.id)?.status === 'completed' ? 'completed' : 'in_progress'}
-        onBack={() => setChatCase(null)}
+        status={cases.find((item) => item.id === chatCase.id)?.status === 'completed' || chats.find((item) => item.case_id === chatCase.id)?.status === 'completed' || chatCase.status === 'completed' ? 'completed' : 'in_progress'}
+        onBack={() => { setChatCase(null); void refreshChats() }}
+        onRead={refreshChats}
       />
     )
   }
 
   return (
     <section className="complaint-page teacher-complaints">
+      <div className="teacher-support-entry">
+        <div className="teacher-support-heading">
+          <h2>담당자와의 채팅</h2>
+          {unreadChats > 0 && <span className="badge complaint-unread-badge" aria-label={`새 메시지 ${unreadChats}개`}>{unreadChats > 99 ? '99+' : unreadChats}</span>}
+        </div>
+        <p className="sub">민원담당자에게서 온 메시지를 확인하고 답장할 수 있습니다.</p>
+        {!chatsLoaded && !chatsError && <p className="loading">담당자 채팅 불러오는 중</p>}
+        {chatsError && <p className="alert" role="alert">{chatsError}</p>}
+        {chatsLoaded && !chatsError && sortedChats.length === 0 && <p className="empty">담당자가 신청서를 열면 이곳에서 채팅할 수 있습니다.</p>}
+        <div className="teacher-support-list">
+          {sortedChats.map((chat) => (
+            <button key={chat.case_id} type="button" className="teacher-support-chat" onClick={() => setChatCase({ id: chat.case_id, status: chat.status })}>
+              <span className="teacher-support-chat-title">
+                <strong>민원 #{chat.case_id} · 담당자와 채팅</strong>
+                {chat.unread_count > 0 && <span className="badge complaint-unread-badge" aria-label={`새 메시지 ${chat.unread_count}개`}>{chat.unread_count > 99 ? '99+' : chat.unread_count}</span>}
+              </span>
+              <span className="teacher-support-preview">{chat.last_message_text || '담당자와 대화를 시작하세요.'}</span>
+              <small>{chat.status === 'completed' ? '처리 완료 · 이전 대화 보기' : '진행 중 · 대화 열기'}{chat.last_message_at ? ` · ${formatTime(chat.last_message_at)}` : ''}</small>
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="eyebrow">COMPLAINT HANDOFF</div>
       <h2>민원 이관</h2>
       <p className="sub">말투 정제를 넘어 부당한 요구로 느껴진 대화를 민원담당자에게 전달할 수 있습니다.</p>
@@ -157,7 +190,7 @@ export default function TeacherComplaints() {
             <p>{complaint.reason}</p>
             <small>선택 대화 {complaint.conversation_ids.length}건</small>
             {complaint.status !== 'received' && (
-              <button type="button" className="outline complaint-chat-open" onClick={() => setChatCase(complaint)}>
+              <button type="button" className="outline complaint-chat-open" onClick={() => setChatCase({ id: complaint.id, status: complaint.status === 'completed' ? 'completed' : 'in_progress' })}>
                 담당자와 채팅 ›
               </button>
             )}

@@ -1,6 +1,7 @@
-import { useCallback, useState, type FormEvent } from 'react'
-import { listComplaintChatMessages, sendComplaintChatMessage } from '../../api/complaints'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { listComplaintChatMessages, markComplaintChatRead, sendComplaintChatMessage } from '../../api/complaints'
 import type { ComplaintChannel, ComplaintChatMessage, ComplaintStatus } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
 import { useSync } from '../../realtime/useSync'
 import { formatTime } from '../chat/formatTime'
 import { useResource } from '../chat/useResource'
@@ -14,15 +15,18 @@ export default function ComplaintChatThread({
   counterpartName,
   status,
   onBack,
+  onRead,
 }: {
   caseId: number
   channel: ComplaintChannel
   counterpartName: string
   status: Exclude<ComplaintStatus, 'received'>
   onBack: () => void
+  onRead?: () => void
 }) {
+  const { session } = useAuth()
   const load = useCallback(() => listComplaintChatMessages(caseId, channel), [caseId, channel])
-  const { data: messages, setData, loaded, error, refresh } = useResource(load, EMPTY)
+  const { data: messages, loaded, error, refresh } = useResource(load, EMPTY)
   useSync(`complaint-chat-${caseId}-${channel}`, refresh, (event) =>
     event.type === 'complaints' && (event.caseId === null || event.caseId === caseId),
   )
@@ -30,6 +34,22 @@ export default function ComplaintChatThread({
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const completed = status === 'completed'
+  const visibleMessages = messages.filter((message) => message.case_id === caseId && message.channel === channel)
+  const lastMessageId = visibleMessages.length ? visibleMessages[visibleMessages.length - 1].id : null
+  const onReadRef = useRef(onRead)
+  useEffect(() => { onReadRef.current = onRead }, [onRead])
+  useEffect(() => {
+    if (lastMessageId === null) return
+    const markVisible = () => {
+      if (!document.hidden) {
+        void markComplaintChatRead(caseId, channel, lastMessageId)
+          .then(() => onReadRef.current?.()).catch(() => {})
+      }
+    }
+    markVisible()
+    document.addEventListener('visibilitychange', markVisible)
+    return () => document.removeEventListener('visibilitychange', markVisible)
+  }, [caseId, channel, lastMessageId])
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -38,8 +58,7 @@ export default function ComplaintChatThread({
     setSending(true)
     setSendError(null)
     try {
-      const sent = await sendComplaintChatMessage(caseId, channel, body)
-      setData((old) => old.some((message) => message.id === sent.id) ? old : [...old, sent])
+      await sendComplaintChatMessage(caseId, channel, body)
       setText('')
       void refresh()
     } catch (e) {
@@ -59,9 +78,9 @@ export default function ComplaintChatThread({
       </div>
       {!loaded && !error && <p className="loading">대화 불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}
-      {loaded && messages.length === 0 && <p className="empty">아직 주고받은 메시지가 없습니다.</p>}
+      {loaded && visibleMessages.length === 0 && <p className="empty">아직 주고받은 메시지가 없습니다.</p>}
       <ol className="complaint-chat-log">
-        {messages.map((message) => (
+        {visibleMessages.map((message) => (
           <li key={message.id} className={`complaint-chat-message ${message.author_role}`}>
             <div className="complaint-chat-meta">
               <strong>{message.author_name}</strong>
@@ -82,7 +101,9 @@ export default function ComplaintChatThread({
             value={text}
             onChange={(event) => setText(event.target.value)}
             maxLength={3000}
-            placeholder="민원담당자와 대화할 내용을 입력해 주세요"
+            placeholder={session?.role === 'complaint_team'
+              ? `${channel === 'parent' ? '학부모' : '교사'}와 대화할 내용을 입력해주세요`
+              : '민원담당자와 대화할 내용을 입력해 주세요'}
             disabled={sending}
             rows={3}
           />

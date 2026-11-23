@@ -6,8 +6,22 @@
 .bottom[aria-label='교사 메뉴']::-webkit-scrollbar { display: none; }
 .bottom[aria-label='교사 메뉴'] button { flex: 0 0 66px; }
 .bottom[aria-label='교사 메뉴'] .nav-label { font-size: 11px; }
+.bottom[aria-label='교사 메뉴'] button:last-child .badge,
+.complaint-unread-badge { background: var(--ios-red, #e5352b); color: var(--white); }
 
 .complaint-page { padding-bottom: 24px; }
+.teacher-support-entry { margin: 0 0 24px; padding: 17px; border: 1px solid #d5e3fa; border-radius: 17px; background: var(--light-blue); }
+.teacher-support-heading { display: flex; align-items: center; gap: 8px; }
+.teacher-support-heading h2 { margin: 0; font-size: 19px; }
+.teacher-support-entry > .sub { margin: 7px 0 12px; font-size: 13px; }
+.teacher-support-entry > .empty { margin: 10px 0 0; }
+.teacher-support-list { display: grid; gap: 8px; max-height: 290px; overflow-y: auto; }
+.teacher-support-chat { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--white); color: var(--navy); font: inherit; text-align: left; cursor: pointer; }
+.teacher-support-chat:hover { border-color: var(--primary); }
+.teacher-support-chat:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.teacher-support-chat-title { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.teacher-support-preview { color: var(--secondary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.teacher-support-chat small { color: var(--primary-strong); font-size: 12px; }
 .complaint-page h2, .complaint-chat-screen h2 { margin: 8px 0; }
 .complaint-page h3 { margin: 18px 0 9px; }
 .complaint-page-heading { margin: 27px 0 12px; }

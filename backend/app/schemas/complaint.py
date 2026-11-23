@@ -57,6 +57,10 @@ class ComplaintChatIn(BaseModel):
     text: str = Field(max_length=4000)
 
 
+class ComplaintChatReadIn(BaseModel):
+    message_id: int = Field(ge=1)
+
+
 class ComplaintChatMessage(BaseModel):
     id: int
     case_id: int
@@ -75,3 +79,4 @@ class ComplaintChatSummary(BaseModel):
     counterpart_name: str
     last_message_at: datetime | None
     last_message_text: str | None
+    unread_count: int

@@ -9,6 +9,7 @@ import { useSync } from '../../realtime/useSync'
 import { formatTime } from '../chat/formatTime'
 import { useResource } from '../chat/useResource'
 import ComplaintChatThread from '../complaints/ComplaintChatThread'
+import '../../design/team-badges.css'
 
 const EMPTY_CASES: ComplaintCaseSummary[] = []
 const EMPTY_CHATS: ComplaintChatSummary[] = []
@@ -18,10 +19,18 @@ const CHAT_STATUSES: Exclude<ComplaintStatus, 'received'>[] = ['in_progress', 'c
 
 // 민원담당자는 일반 교사·학부모 화면과 분리된 전용 메뉴로 들어온다.
 export default function TeamHome() {
+  const loadParentChats = useCallback(() => listComplaintChats('parent'), [])
+  const loadTeacherChats = useCallback(() => listComplaintChats('teacher'), [])
+  const { data: parentChats, refresh: refreshParentChats } = useResource(loadParentChats, EMPTY_CHATS)
+  const { data: teacherChats, refresh: refreshTeacherChats } = useResource(loadTeacherChats, EMPTY_CHATS)
+  useSync('team-parent-chat-badges', refreshParentChats, (event) => event.type === 'complaints')
+  useSync('team-teacher-chat-badges', refreshTeacherChats, (event) => event.type === 'complaints')
+  const parentUnread = parentChats.reduce((total, chat) => total + chat.unread_count, 0)
+  const teacherUnread = teacherChats.reduce((total, chat) => total + chat.unread_count, 0)
   const nav: NavItem[] = [
     { to: '/team', label: '신청서', icon: <ComplaintIcon />, end: true },
-    { to: '/team/parent-chats', label: '학부모채팅', icon: <ChatIcon /> },
-    { to: '/team/teacher-chats', label: '교사채팅', icon: <ChatIcon /> },
+    { to: '/team/parent-chats', label: '학부모채팅', icon: <ChatIcon />, badge: parentUnread },
+    { to: '/team/teacher-chats', label: '교사채팅', icon: <ChatIcon />, badge: teacherUnread },
   ]
   return (
     <AppShell title="민원담당자" nav={<BottomNav items={nav} label="민원담당자 메뉴" />}>
@@ -244,7 +253,8 @@ function TeamChatTab({ channel }: { channel: ComplaintChannel }) {
   if (selected) return <>
     <Link className="complaint-case-jump" to={`/team?case=${selected.case_id}`}>신청서 #{selected.case_id} 바로 보기 →</Link>
     <ComplaintChatThread key={`${selected.case_id}-${channel}`} caseId={selected.case_id} channel={channel}
-      counterpartName={selected.counterpart_name} status={selected.status} onBack={() => setParams({})} />
+      counterpartName={selected.counterpart_name} status={selected.status} onRead={refresh}
+      onBack={() => { setParams({}); void refresh() }} />
   </>
   const shown = chats.filter((chat) => chat.status === filter)
   return <section className="complaint-page">
@@ -261,6 +271,9 @@ function TeamChatTab({ channel }: { channel: ComplaintChannel }) {
     <ul className="plain-list complaint-case-list">{shown.map((chat) => <li key={chat.case_id}>
       <button type="button" className="report-card" onClick={() => setParams({ case: String(chat.case_id) })}>
         <span className="report-card-top"><span className="tag">{STATUS_LABEL[chat.status]}</span>
+          {chat.unread_count > 0 && <span className="unread" aria-label={`안 읽은 메시지 ${chat.unread_count}개`}>
+            {chat.unread_count > 99 ? '99+' : chat.unread_count}
+          </span>}
           {chat.last_message_at && <small>{formatTime(chat.last_message_at)}</small>}</span>
         <h3>#{chat.case_id} · {chat.counterpart_name}</h3>
         <p>{chat.last_message_text || '아직 주고받은 메시지가 없습니다.'}</p><small>채팅 열기 ›</small>

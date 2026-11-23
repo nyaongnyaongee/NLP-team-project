@@ -185,6 +185,7 @@ export type ComplaintChatSummary = {
   counterpart_name: string
   last_message_at: string | null
   last_message_text: string | null
+  unread_count: number
 }
 
 export type ComplaintChatMessage = {

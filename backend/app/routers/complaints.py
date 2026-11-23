@@ -14,7 +14,7 @@ from app.db.database import SessionLocal, get_db
 from app.routers import messages as messages_router
 from app.routers.ws import hub
 from app.schemas.complaint import (
-    ComplaintChatIn, ComplaintChatMessage, ComplaintChatSummary, ComplaintDetail,
+    ComplaintChatIn, ComplaintChatMessage, ComplaintChatReadIn, ComplaintChatSummary, ComplaintDetail,
     ComplaintIn, ComplaintSummary,
 )
 
@@ -215,11 +215,22 @@ def list_chats(channel: Literal["parent", "teacher"], db: Session = Depends(get_
             "SELECT body, created_at FROM complaint_case_chat_messages "
             "WHERE case_id = :id AND channel = :ch ORDER BY id DESC LIMIT 1"),
             {"id": case["id"], "ch": channel}).mappings().first()
+        # 담당자 계정이 여러 명이어도 각자가 읽은 위치만 기준으로 상대 메시지를 센다.
+        sender_role = channel if user["role"] == TEAM else TEAM
+        unread = db.execute(text(
+            "SELECT count(*) FROM complaint_case_chat_messages m "
+            "JOIN users author ON author.id = m.author_id "
+            "LEFT JOIN complaint_case_chat_reads r ON r.case_id = m.case_id "
+            "AND r.channel = m.channel AND r.user_id = :viewer "
+            "WHERE m.case_id = :id AND m.channel = :ch "
+            "AND author.role = :sender_role AND m.id > COALESCE(r.last_read_message_id, 0)"),
+            {"viewer": user["id"], "id": case["id"], "ch": channel,
+             "sender_role": sender_role}).scalar_one()
         counterpart = case["parent_name"] if user["role"] == TEAM and channel == "parent" else (
             case["teacher_name"] if user["role"] == TEAM else "민원 담당자")
         out.append({"case_id": case["id"], "channel": channel, "status": case["status"],
                     "counterpart_name": counterpart, "last_message_at": last["created_at"] if last else None,
-                    "last_message_text": last["body"] if last else None})
+                    "last_message_text": last["body"] if last else None, "unread_count": unread})
     return out
 
 
@@ -326,6 +337,28 @@ def chat_messages(case_id: int, channel: Literal["parent", "teacher"],
         "WHERE m.case_id = :id AND m.channel = :ch ORDER BY m.id"),
         {"id": case_id, "ch": channel}).mappings().all()
     return [dict(r) for r in rows]
+
+
+@router.post("/{case_id}/chats/{channel}/read", status_code=204)
+def read_chat_messages(case_id: int, channel: Literal["parent", "teacher"], body: ComplaintChatReadIn,
+                       db: Session = Depends(get_db), user=Depends(current_user)):
+    """현재 화면에서 받은 마지막 메시지까지만 읽음 처리한다. 이후 도착한 글은 배지에 남는다."""
+    _chat_case(db, case_id, channel, user)
+    exists = db.execute(text(
+        "SELECT 1 FROM complaint_case_chat_messages "
+        "WHERE id = :mid AND case_id = :id AND channel = :ch"),
+        {"mid": body.message_id, "id": case_id, "ch": channel}).scalar()
+    if not exists:
+        raise HTTPException(400, "읽은 메시지를 찾을 수 없습니다")
+    db.execute(text(
+        "INSERT INTO complaint_case_chat_reads (case_id, channel, user_id, last_read_message_id) "
+        "VALUES (:id, :ch, :viewer, :mid) "
+        "ON CONFLICT (case_id, channel, user_id) DO UPDATE SET "
+        "last_read_message_id = GREATEST(complaint_case_chat_reads.last_read_message_id, "
+        "EXCLUDED.last_read_message_id)"),
+        {"id": case_id, "ch": channel, "viewer": user["id"], "mid": body.message_id})
+    db.commit()
+    hub.notify_users([user["id"]], {"type": "complaints", "case_id": case_id})
 
 
 @router.post("/{case_id}/chats/{channel}/messages", response_model=ComplaintChatMessage, status_code=201)

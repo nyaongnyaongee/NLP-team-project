@@ -39,6 +39,13 @@ export function listComplaintChatMessages(caseId: number, channel: ComplaintChan
   return request<ComplaintChatMessage[]>(`/complaints/${caseId}/chats/${channel}/messages`)
 }
 
+export function markComplaintChatRead(caseId: number, channel: ComplaintChannel, messageId: number): Promise<void> {
+  return request<void>(`/complaints/${caseId}/chats/${channel}/read`, {
+    method: 'POST',
+    json: { message_id: messageId },
+  })
+}
+
 export function sendComplaintChatMessage(caseId: number, channel: ComplaintChannel, text: string): Promise<ComplaintChatMessage> {
   return request<ComplaintChatMessage>(`/complaints/${caseId}/chats/${channel}/messages`, {
     method: 'POST',
