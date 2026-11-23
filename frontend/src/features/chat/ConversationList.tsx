@@ -118,7 +118,7 @@ export default function ConversationList({
   }
 
   return (
-    <ul className="plain-list">
+    <ul className="plain-list conv-list">
       {conversations.map((c) => {
         const actions = actionsOf(c)
         const open = openId === c.id

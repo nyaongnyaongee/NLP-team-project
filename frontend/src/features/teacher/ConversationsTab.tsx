@@ -53,6 +53,17 @@ export default function ConversationsTab() {
     navigate({ search: `?chat=${id}` }, { state: { fromList: true } })
   }
 
+  const newButton = (
+    <button
+      type="button"
+      className="new-conv"
+      onClick={() => setStarting((v) => !v)}
+      aria-expanded={starting}
+    >
+      {starting ? '닫기' : '＋ 새 대화'}
+    </button>
+  )
+
   if (selected) {
     return (
       <TeacherThread
@@ -74,15 +85,27 @@ export default function ConversationsTab() {
 
   return (
     <section>
-      <TeacherDashboard openCount={openCount} todoCount={todoCount} onOpenConversations={() => setShow('open')} />
-      <div className="notice-heading list-heading">
-        <h3>학생·학부모별 대화</h3>
-        {!starting && (
-          <button type="button" className="notice-create" onClick={() => setStarting(true)}>
-            ＋ 새 대화
-          </button>
-        )}
-      </div>
+      <TeacherDashboard
+        unreadCount={conversations.filter((c) => c.status === 'open' && c.unread).length}
+        todoCount={todoCount}
+        onOpenConversations={() => setShow('open')}
+      />
+      {loading && <p className="loading">불러오는 중</p>}
+      {error && <p className="alert" role="alert">{error}</p>}
+      {notice && <p className="alert" role="alert" ref={revealRef}>{notice}</p>}
+      {!loading && !error && conversations.length === 0 && (
+        <div className="empty">
+          <div className="big">▤</div>아직 대화가 없어요. 「＋ 새 대화」로 학부모와 대화를 시작하세요
+        </div>
+      )}
+      {conversations.length > 0 ? (
+        <StatusFilter show={show} setShow={setShow} openCount={openCount} closedCount={closedCount}
+          shownCount={shown.length}
+          sort={sortControl}
+          extra={newButton} />
+      ) : (
+        <div className="filter-row">{newButton}</div>
+      )}
       {starting && (
         <StartConversation
           role="teacher"
@@ -94,19 +117,6 @@ export default function ConversationsTab() {
             select(c.id)
           }}
         />
-      )}
-      {loading && <p className="loading">불러오는 중</p>}
-      {error && <p className="alert" role="alert">{error}</p>}
-      {notice && <p className="alert" role="alert" ref={revealRef}>{notice}</p>}
-      {!loading && !error && conversations.length === 0 && (
-        <div className="empty">
-          <div className="big">▤</div>아직 대화가 없어요. 「＋ 새 대화」로 학부모와 대화를 시작하세요
-        </div>
-      )}
-      {conversations.length > 0 && (
-        <StatusFilter show={show} setShow={setShow} openCount={openCount} closedCount={closedCount}
-          shownCount={shown.length}
-          sort={sortControl} />
       )}
       <ConversationList
         conversations={shown}
