@@ -88,12 +88,17 @@ export default function ParentCompose() {
 
   return (
     <section className="compose-home">
-      <h2 className="hero-title">
-        선생님께
-        <br />
-        이야기를 전해보세요.
-      </h2>
-      <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
+      {/* 시연 상황 카드가 있으면 큰 제목 · 큰 선생님 카드를 줄여, 카드를 보면서 바로 아래 입력칸에 쓰게 한다 */}
+      {!scenario && (
+        <>
+          <h2 className="hero-title">
+            선생님께
+            <br />
+            이야기를 전해보세요.
+          </h2>
+          <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
+        </>
+      )}
 
       {scenario && (
         <ScenarioCard
@@ -116,7 +121,7 @@ export default function ParentCompose() {
           담임 선생님께 받은 초대 코드로 자녀를 추가해 주세요.
         </div>
       )}
-      <div className="teacher-cards" role={kids.length > 1 ? 'radiogroup' : undefined} aria-label="받는 선생님">
+      <div className={`teacher-cards${scenario ? ' compact' : ''}`} role={kids.length > 1 ? 'radiogroup' : undefined} aria-label="받는 선생님">
         {kids.map((k) => {
           const on = picked?.student_id === k.student_id
           return (
@@ -128,8 +133,9 @@ export default function ParentCompose() {
               aria-checked={kids.length > 1 ? on : undefined}
               onClick={() => setPickedId(k.student_id)}
             >
-              <span className="avatar big">{k.teacher_name.slice(0, 1)}</span>
+              <span className={`avatar${scenario ? '' : ' big'}`}>{k.teacher_name.slice(0, 1)}</span>
               <span>
+                {scenario && <small className="teacher-to">받는 사람</small>}
                 <b>{k.teacher_name} 선생님</b>
                 <small>
                   {SCHOOL_NAME} · {k.student_name} 담임
@@ -139,7 +145,7 @@ export default function ParentCompose() {
           )
         })}
       </div>
-      {loaded && (
+      {loaded && !scenario && (
         <AddChild
           onAdded={(s) => {
             setData((rows) => [...rows, s])
@@ -150,20 +156,24 @@ export default function ParentCompose() {
 
       {picked && (
         <>
-          <div className="compose-head">
-            <h3>메시지 작성</h3>
-            <button type="button" className="link-button" onClick={() => setShowTemplates((v) => !v)}>
-              {showTemplates ? '자주 쓰는 글 숨기기' : '자주 쓰는 글'}
-            </button>
-          </div>
-          {showTemplates && (
-            <div className="example-chips">
-              {TEMPLATES.map((t) => (
-                <button key={t.label} type="button" onClick={() => applyTemplate(t.text)}>
-                  {t.label}
+          {!scenario && (
+            <>
+              <div className="compose-head">
+                <h3>메시지 작성</h3>
+                <button type="button" className="link-button" onClick={() => setShowTemplates((v) => !v)}>
+                  {showTemplates ? '자주 쓰는 글 숨기기' : '자주 쓰는 글'}
                 </button>
-              ))}
-            </div>
+              </div>
+              {showTemplates && (
+                <div className="example-chips">
+                  {TEMPLATES.map((t) => (
+                    <button key={t.label} type="button" onClick={() => applyTemplate(t.text)}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <textarea
             ref={textRef}
