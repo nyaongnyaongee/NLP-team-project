@@ -45,6 +45,13 @@ export const NoticeIcon = () => (
   </Icon>
 )
 
+export const ComplaintIcon = () => (
+  <Icon>
+    <path d="M6 3h9l3 3v15H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+    <path d="M14 3v4h4M8 11h6M8 15h7" />
+  </Icon>
+)
+
 export const StudentIcon = () => (
   <Icon>
     <circle cx="9" cy="8" r="3.5" />

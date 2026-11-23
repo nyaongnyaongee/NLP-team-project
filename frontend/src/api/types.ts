@@ -118,3 +118,83 @@ export type ParentEvent = {
   due_at: string | null
   status: 'added' | 'done'
 }
+
+// 민원 이관 신청서. 교사 응답은 사유·상태만, 담당자 상세 응답에만 원문과 AI 근거가 온다.
+export type ComplaintStatus = 'received' | 'in_progress' | 'completed'
+export type ComplaintChannel = 'parent' | 'teacher'
+export type ComplaintReportStatus = 'pending' | 'done' | 'failed'
+
+export type ComplaintCaseSummary = {
+  id: number
+  teacher_id: number
+  parent_id: number
+  teacher_name: string
+  parent_name: string
+  reason: string
+  status: ComplaintStatus
+  report_status: ComplaintReportStatus
+  report_requested_at: string
+  conversation_ids: number[]
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+}
+
+export type ComplaintEvidence = {
+  conversation_id: number
+  message_id: number
+  at: string
+  quote: string
+}
+
+export type ComplaintReport = {
+  summary: string
+  parent_messages: number
+  rude_messages: number
+  repeated_demands_count: number
+  repeated_demands: { theme: string; evidence: ComplaintEvidence[] }[]
+  reason_evidence: (ComplaintEvidence & { explanation: string })[]
+  rude_evidence: (ComplaintEvidence & { types: string[] })[]
+}
+
+export type ComplaintTranscriptMessage = {
+  id: number
+  who: 'parent' | 'teacher'
+  text: string | null
+  raw_text: string | null
+  refined_text: string | null
+  status: MessageStatus
+  created_at: string
+}
+
+export type ComplaintCaseDetail = ComplaintCaseSummary & {
+  report: ComplaintReport | null
+  report_error: string | null
+  conversations: {
+    id: number
+    student_name: string
+    status: 'open' | 'closed'
+    messages: ComplaintTranscriptMessage[]
+  }[]
+}
+
+export type ComplaintChatSummary = {
+  case_id: number
+  channel: ComplaintChannel
+  status: Exclude<ComplaintStatus, 'received'>
+  counterpart_name: string
+  last_message_at: string | null
+  last_message_text: string | null
+  unread_count: number
+}
+
+export type ComplaintChatMessage = {
+  id: number
+  case_id: number
+  channel: ComplaintChannel
+  author_id: number
+  author_name: string
+  author_role: Role
+  text: string
+  created_at: string
+}

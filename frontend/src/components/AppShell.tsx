@@ -12,7 +12,7 @@ export const SCHOOL_NAME = '숭실초등학교'
 const WHO: Record<string, (name: string) => string> = {
   parent: (n) => `학부모 전용 · ${n} 학부모`,
   teacher: (n) => `교사 전용 · ${n} 선생님`,
-  complaint_team: (n) => `민원이관팀 · ${n}`,
+  complaint_team: (n) => `민원담당자 전용 · ${n}`,
 }
 
 // 실시간 알림 연결 상태 (교사 화면 「알림 ON」). 끊기면 화면은 2초마다 다시 읽는다

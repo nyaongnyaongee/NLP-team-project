@@ -6,6 +6,7 @@ import { useConversations } from '../chat/useConversations'
 import ParentNotices from '../notices/ParentNotices'
 import ParentCalendar from './ParentCalendar'
 import ParentCompose from './ParentCompose'
+import ParentComplaintChat from './ParentComplaintChat'
 import ParentConversationTab from './ParentConversationTab'
 
 // 학부모 화면의 틀: 위에 계정 표시, 가운데에 탭 내용, 아래에 탭 메뉴 (명세 8장 주소 구조: /parent/...)
@@ -16,6 +17,7 @@ export default function ParentHome() {
   const nav: NavItem[] = [
     { to: '/parent', label: '메시지 작성', icon: <PenIcon />, end: true },
     { to: '/parent/chats', label: '대화 목록', icon: <ChatIcon />, badge: unread },
+    { to: '/parent/support', label: '담당자 채팅', icon: <ChatIcon /> },
     { to: '/parent/calendar', label: '캘린더', icon: <CalendarIcon /> },
     { to: '/parent/notices', label: '공지사항', icon: <NoticeIcon /> },
   ]
@@ -24,6 +26,7 @@ export default function ParentHome() {
       <Routes>
         <Route index element={<ParentCompose />} />
         <Route path="chats" element={<ParentConversationTab />} />
+        <Route path="support" element={<ParentComplaintChat />} />
         <Route path="calendar" element={<ParentCalendar />} />
         <Route path="notices/*" element={<ParentNotices />} />
         <Route path="*" element={<Navigate to="/parent" replace />} />

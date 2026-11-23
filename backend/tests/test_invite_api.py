@@ -58,7 +58,8 @@ def test_학부모는_코드로_자녀를_더_잇는다(client, auth, invite):
     r = client.post("/children", json={"invite_code": "TEST26", "student_name": "박둘째"}, headers=auth("parent1"))
     assert r.status_code == 200 and r.json()["student_name"] == "박둘째"
     names = [s["student_name"] for s in client.get("/conversations/startable", headers=auth("parent1")).json()]
-    assert names == ["박둘째", "서윤"]
+    # PostgreSQL 의 한글 정렬 순서는 서버 로캘에 따라 달라질 수 있다.
+    assert set(names) == {"박둘째", "서윤"}
     again = client.post("/children", json={"invite_code": "TEST26", "student_name": "서윤"}, headers=auth("parent1"))
     assert again.status_code == 409 and "이미 연결된" in again.json()["detail"]
     assert client.post("/children", json={"invite_code": "TEST26", "student_name": "누구"},

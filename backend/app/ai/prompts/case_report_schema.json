@@ -1,0 +1,63 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {"type": "string"},
+    "rude_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "no": {"type": "integer"},
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["욕설", "인신공격 · 모욕", "비꼼 · 조롱", "반말 · 호통", "위협 · 협박", "교사 자질 비난"]
+            }
+          },
+          "quote": {"type": "string"}
+        },
+        "required": ["no", "types", "quote"],
+        "additionalProperties": false
+      }
+    },
+    "repeated_demands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "theme": {"type": "string"},
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "no": {"type": "integer"},
+                "quote": {"type": "string"}
+              },
+              "required": ["no", "quote"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["theme", "evidence"],
+        "additionalProperties": false
+      }
+    },
+    "reason_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "no": {"type": "integer"},
+          "quote": {"type": "string"},
+          "explanation": {"type": "string"}
+        },
+        "required": ["no", "quote", "explanation"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["summary", "rude_evidence", "repeated_demands", "reason_evidence"],
+  "additionalProperties": false
+}

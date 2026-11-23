@@ -95,9 +95,11 @@ def no_background_refine(monkeypatch):
     """학부모 메시지를 보내도 진짜 Claude 를 부르지 않게 정제를 꺼 둔다 (.env 에 키가 있어도 돈이 안 나가게).
     정제를 시험하는 파일만 refine_with 로 가짜 응답을 넣어 켠다."""
     import app.routers.conversations as conversations_router
+    import app.routers.complaints as complaints_router
     import app.routers.messages as messages_router
     import app.routers.reports as reports_router
 
     monkeypatch.setattr(messages_router, "_refine_in_background", lambda *a, **k: None)
     monkeypatch.setattr(conversations_router, "_extract_in_background", lambda *a, **k: None)  # 대화를 닫아도 추출 안 함
     monkeypatch.setattr(reports_router, "_report_in_background", lambda *a, **k: None)  # 신고해도 보고서 안 씀
+    monkeypatch.setattr(complaints_router, "_report_in_background", lambda *a, **k: None)  # 민원 이관도 실제 Claude 호출 금지

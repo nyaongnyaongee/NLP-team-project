@@ -8,6 +8,7 @@ export type ServerEvent =
   | { type: 'events' } // 학부모: 선생님이 공유한 일정이 바뀜
   | { type: 'students' } // 교사: 초대 코드로 학부모 · 자녀가 반에 이어짐
   | { type: 'faq' } // 자주 묻는 질문이 등록 · 수정 · 삭제됨
+  | { type: 'complaints'; caseId: number | null } // 민원 신청 · 진행 상태 · 채팅 변경
 
 export type SocketHandlers = {
   onReady: () => void
@@ -17,13 +18,16 @@ export type SocketHandlers = {
 
 function parseEvent(data: unknown): ServerEvent | null {
   if (!data || typeof data !== 'object') return null
-  const msg = data as { type?: unknown; conversation_id?: unknown; notice_id?: unknown }
+  const msg = data as { type?: unknown; conversation_id?: unknown; notice_id?: unknown; case_id?: unknown }
   if (msg.type === 'changed' && typeof msg.conversation_id === 'number') {
     return { type: 'changed', conversationId: msg.conversation_id }
   }
   if (msg.type === 'events') return { type: 'events' }
   if (msg.type === 'students') return { type: 'students' }
   if (msg.type === 'faq') return { type: 'faq' }
+  if (msg.type === 'complaints') {
+    return { type: 'complaints', caseId: typeof msg.case_id === 'number' ? msg.case_id : null }
+  }
   if (msg.type === 'notice') {
     return { type: 'notice', noticeId: typeof msg.notice_id === 'number' ? msg.notice_id : null }
   }

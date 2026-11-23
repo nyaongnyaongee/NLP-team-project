@@ -7,6 +7,7 @@
 - Q&A 초안     call_draft_faq     prompts/draft_faq_system.txt    · draft_faq_schema.json
 - 할 일 · 일정(C) call_extract     prompts/extract_system.txt      · extract_schema.json
 - 신고 보고서(D) call_report      prompts/report_system.txt       · report_schema.json
+- 민원 이관 보고서 call_case_report prompts/case_report_system.txt · case_report_schema.json
 
 가린 글(masked)만 받는다. 원문 · 매핑표는 이 파일에 들어오지 않는다.
 """
@@ -34,6 +35,7 @@ DRAFT_NOTICE_PROMPT, DRAFT_NOTICE_SCHEMA = _load("draft_notice")
 DRAFT_FAQ_PROMPT, DRAFT_FAQ_SCHEMA = _load("draft_faq")
 EXTRACT_PROMPT, EXTRACT_SCHEMA = _load("extract")
 REPORT_PROMPT, REPORT_SCHEMA = _load("report")
+CASE_REPORT_PROMPT, CASE_REPORT_SCHEMA = _load("case_report")
 
 DEFAULT_EFFORT = "medium"  # 12건 시험(2026-11-08)에서 medium 으로 쟀음. 모델 · effort 는 더 시험해서 정한다
 MAX_TOKENS = 4000
@@ -99,6 +101,11 @@ def call_extract(masked: str, **kw) -> ClaudeReply:
 def call_report(masked: str, **kw) -> ClaudeReply:
     """가린 대화(학부모 글은 원문) + 담임 메모로 민원대응팀용 신고 보고서를 쓴다."""
     return call_json(REPORT_PROMPT, REPORT_SCHEMA, masked, **kw)
+
+
+def call_case_report(masked: str, **kw) -> ClaudeReply:
+    """가린 여러 대화의 원문과 신청 사유로 민원 이관 근거 보고서를 쓴다."""
+    return call_json(CASE_REPORT_PROMPT, CASE_REPORT_SCHEMA, masked, **kw)
 
 
 def call_json(system: str, schema: dict, masked: str, *, model: str | None = None, effort: str = DEFAULT_EFFORT,
