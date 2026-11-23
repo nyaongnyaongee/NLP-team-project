@@ -1,0 +1,105 @@
+/* 민원 이관: 교사 신청서와 담당자 보고서·채팅. 기존 Sky Blue 토큰을 공유한다. */
+.bottom[aria-label='교사 메뉴'] {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bottom[aria-label='교사 메뉴']::-webkit-scrollbar { display: none; }
+.bottom[aria-label='교사 메뉴'] button { flex: 0 0 66px; }
+.bottom[aria-label='교사 메뉴'] .nav-label { font-size: 11px; }
+
+.complaint-page { padding-bottom: 24px; }
+.complaint-page h2, .complaint-chat-screen h2 { margin: 8px 0; }
+.complaint-page h3 { margin: 18px 0 9px; }
+.complaint-page-heading { margin: 27px 0 12px; }
+.complaint-page-heading h3 { margin: 0; }
+.complaint-page .report-policy p { margin-bottom: 0; }
+.complaint-form {
+  margin: 22px 0 28px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: var(--white);
+}
+.complaint-form h3 { margin-top: 0; }
+.complaint-form .info { line-height: 1.65; }
+.complaint-choices {
+  min-width: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  margin: 17px 0 9px;
+  padding: 0;
+  border: 0;
+}
+.complaint-choices legend, .complaint-form .editor-label {
+  margin-bottom: 9px;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 700;
+}
+.complaint-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.complaint-choice.selected { border-color: var(--primary); background: var(--light-blue); }
+.complaint-choice.disabled { opacity: .48; cursor: not-allowed; }
+.complaint-choice input { flex: none; width: 18px; height: 18px; margin-top: 3px; accent-color: var(--primary); }
+.complaint-choice-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; line-height: 1.55; }
+.complaint-choice-main strong { font-size: 14px; }
+.complaint-choice-main span { font-size: 13px; color: var(--secondary); overflow-wrap: anywhere; }
+.complaint-choice-main small { font-size: 12px; color: var(--primary-strong); }
+.complaint-hint { display: block; color: var(--secondary); font-size: 12px; line-height: 1.6; margin: 6px 0 14px; }
+.complaint-form textarea, .complaint-chat-form textarea { width: 100%; min-height: 110px; resize: vertical; }
+.complaint-form .primary, .complaint-detail > .primary { width: 100%; margin-top: 12px; }
+.complaint-status-tabs { display: flex; gap: 7px; overflow-x: auto; margin: 18px 0 14px; }
+.complaint-status-tabs button {
+  flex: 1 0 auto;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.complaint-status-tabs button.active { background: var(--light-blue); color: var(--primary-strong); border-color: var(--primary); }
+.complaint-status-tabs button span { margin-left: 3px; }
+.complaint-case-list .report-card { margin: 10px 0; }
+.complaint-case-list button.report-card { cursor: pointer; }
+.complaint-case-list .report-card p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.complaint-chat-open { display: block; width: 100%; margin-top: 14px; }
+.complaint-report { margin-top: 28px; padding-top: 5px; border-top: 1px solid var(--border); }
+.complaint-evidence-group { margin: 18px 0; }
+.complaint-evidence-group > b { font-size: 14px; }
+.report-evidence a { color: var(--primary-strong); font-size: 13px; font-weight: 650; }
+.report-evidence li { margin: 12px 0; }
+.report-evidence li p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-message { scroll-margin-top: 18px; }
+.report-conversation summary { list-style: none; }
+.report-conversation summary::-webkit-details-marker { display: none; }
+.complaint-detail-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 20px 0; }
+.complaint-detail-actions .outline { display: inline-flex; flex: 1 1 130px; justify-content: center; text-decoration: none; }
+.complaint-report-failed .outline { margin: 5px 0 10px; }
+.complaint-chat-screen { padding-bottom: 26px; }
+.complaint-chat-log { list-style: none; margin: 16px 0; padding: 0; }
+.complaint-chat-message { margin: 12px 0; padding: 13px 15px; border: 1px solid var(--border); border-radius: 15px; background: var(--white); }
+.complaint-chat-message.complaint_team { background: var(--light-blue); border-color: #d5e3fa; }
+.complaint-chat-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.complaint-chat-meta time { flex: none; color: var(--secondary); }
+.complaint-chat-message p { margin: 9px 0 0; font-size: 15px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.complaint-chat-form { margin-top: 18px; }
+.complaint-chat-form label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: 700; }
+.complaint-chat-form .primary { width: 100%; margin-top: 9px; }
+
+@media (max-width: 350px) {
+  .bottom[aria-label='교사 메뉴'] button { flex-basis: 64px; }
+  .complaint-form { padding: 14px; }
+  .complaint-status-tabs button { font-size: 12px; }
+}

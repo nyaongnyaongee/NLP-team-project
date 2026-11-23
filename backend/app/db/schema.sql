@@ -1,4 +1,4 @@
--- 이음 시연용 DB 테이블 (PostgreSQL) — 7개
+-- 이음 시연용 DB 테이블 (PostgreSQL)
 
 -- 사용자: 학부모 · 교사 · 민원대응팀
 CREATE TABLE users (
@@ -110,6 +110,44 @@ CREATE TABLE student_memos (
   body       TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (student_id, teacher_id)
+);
+
+-- 민원 이관 신청서: 처리 상태와 AI 보고서 생성 상태는 별개다.
+CREATE TABLE complaint_cases (
+  id             BIGSERIAL PRIMARY KEY,
+  teacher_id     BIGINT NOT NULL REFERENCES users(id),
+  parent_id      BIGINT NOT NULL REFERENCES users(id),
+  reason         TEXT NOT NULL CHECK (length(btrim(reason)) > 0),
+  status         TEXT NOT NULL DEFAULT 'received'
+                 CHECK (status IN ('received', 'in_progress', 'completed')),
+  report_status  TEXT NOT NULL DEFAULT 'pending'
+                 CHECK (report_status IN ('pending', 'done', 'failed')),
+  report_requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  report         JSONB,
+  report_error   TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at     TIMESTAMPTZ,
+  completed_at   TIMESTAMPTZ
+);
+
+-- 신청 당시 각 대화의 마지막 메시지 번호로 증거 범위를 고정한다.
+CREATE TABLE complaint_case_conversations (
+  case_id         BIGINT NOT NULL REFERENCES complaint_cases(id) ON DELETE CASCADE,
+  conversation_id BIGINT NOT NULL REFERENCES conversations(id),
+  selected_order  INTEGER NOT NULL,
+  max_message_id  BIGINT,
+  PRIMARY KEY (case_id, conversation_id),
+  UNIQUE (case_id, selected_order)
+);
+
+-- 민원 담당자와 학부모 / 교사 간 별도 채팅. 원래 대화의 메시지와 섞지 않는다.
+CREATE TABLE complaint_case_chat_messages (
+  id          BIGSERIAL PRIMARY KEY,
+  case_id     BIGINT NOT NULL REFERENCES complaint_cases(id) ON DELETE CASCADE,
+  channel     TEXT NOT NULL CHECK (channel IN ('parent', 'teacher')),
+  author_id   BIGINT NOT NULL REFERENCES users(id),
+  body        TEXT NOT NULL CHECK (length(btrim(body)) > 0),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- messages.analysis 예시 (확정 아님, 프롬프트에 따라 바뀜)

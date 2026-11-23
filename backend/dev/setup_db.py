@@ -42,7 +42,7 @@ def main():
         raw.cursor().execute(SCHEMA.read_text(encoding="utf-8"))
         raw.commit()
         raw.close()
-        print("테이블 만듦 (users · students · conversations · messages · tasks · notices · notice_comments · student_memos)")
+        print("테이블 만듦 (사용자 · 대화 · 일정 · 공지 · Q&A · 민원 이관 포함)")
     else:
         _upgrade(eng)
 
@@ -107,6 +107,37 @@ UPGRADES = [
       PRIMARY KEY (student_id, teacher_id)
     )""",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code TEXT UNIQUE",  # 교사 반 초대 코드 (학부모 자녀 잇기)
+    """CREATE TABLE IF NOT EXISTS complaint_cases (
+      id BIGSERIAL PRIMARY KEY,
+      teacher_id BIGINT NOT NULL REFERENCES users(id),
+      parent_id BIGINT NOT NULL REFERENCES users(id),
+      reason TEXT NOT NULL CHECK (length(btrim(reason)) > 0),
+      status TEXT NOT NULL DEFAULT 'received' CHECK (status IN ('received', 'in_progress', 'completed')),
+      report_status TEXT NOT NULL DEFAULT 'pending' CHECK (report_status IN ('pending', 'done', 'failed')),
+      report_requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      report JSONB,
+      report_error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      started_at TIMESTAMPTZ,
+      completed_at TIMESTAMPTZ
+    )""",
+    "ALTER TABLE complaint_cases ADD COLUMN IF NOT EXISTS report_requested_at TIMESTAMPTZ NOT NULL DEFAULT now()",
+    """CREATE TABLE IF NOT EXISTS complaint_case_conversations (
+      case_id BIGINT NOT NULL REFERENCES complaint_cases(id) ON DELETE CASCADE,
+      conversation_id BIGINT NOT NULL REFERENCES conversations(id),
+      selected_order INTEGER NOT NULL,
+      max_message_id BIGINT,
+      PRIMARY KEY (case_id, conversation_id),
+      UNIQUE (case_id, selected_order)
+    )""",
+    """CREATE TABLE IF NOT EXISTS complaint_case_chat_messages (
+      id BIGSERIAL PRIMARY KEY,
+      case_id BIGINT NOT NULL REFERENCES complaint_cases(id) ON DELETE CASCADE,
+      channel TEXT NOT NULL CHECK (channel IN ('parent', 'teacher')),
+      author_id BIGINT NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL CHECK (length(btrim(body)) > 0),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )""",
     """DO $$ BEGIN
       IF to_regclass('public.student_notes') IS NOT NULL THEN
         INSERT INTO student_memos (student_id, teacher_id, body, updated_at)

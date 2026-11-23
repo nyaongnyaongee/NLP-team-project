@@ -10,5 +10,5 @@ export const HOME_PATH: Record<Role, string> = {
 export const ROLE_LABEL: Record<Role, string> = {
   parent: '학부모',
   teacher: '교사',
-  complaint_team: '민원이관팀',
+  complaint_team: '민원담당자',
 }
