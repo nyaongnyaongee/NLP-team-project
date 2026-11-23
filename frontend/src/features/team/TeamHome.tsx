@@ -85,30 +85,57 @@ function EvidenceReference({ evidence, children }: { evidence: ComplaintEvidence
   </a><p>“{evidence.quote}”</p>{children}</li>
 }
 
-function ReportView({ report }: { report: ComplaintReport }) {
+function ReportView({ report, conversationCount }: {
+  report: ComplaintReport
+  conversationCount: number
+}) {
+  const [openEvidence, setOpenEvidence] = useState<'rude' | 'repeated' | null>(null)
+  const toggleEvidence = (kind: 'rude' | 'repeated') => {
+    setOpenEvidence((current) => current === kind ? null : kind)
+  }
+
   return <section className="complaint-report" aria-label="AI 민원 근거 보고서">
-    <h3>AI 민원 근거 보고서</h3>
-    <p className="report-reason">{report.summary}</p>
-    <div className="report-metrics">
-      <div><strong>{report.parent_messages}</strong><span>학부모 메시지</span></div>
-      <div><strong>{report.rude_messages}</strong><span>거친 표현 메시지</span></div>
-      <div><strong>{report.repeated_demands_count}</strong><span>반복 요구 메시지</span></div>
+    <div className="complaint-report-heading">
+      <span className="eyebrow">AI EVIDENCE REPORT</span>
+      <h3>AI 민원 근거 보고서</h3>
+      <p>교사의 신청 사유와 학부모 원문을 비교해 확인된 내용을 정리했습니다.</p>
     </div>
-    <section className="report-section"><h4>반복된 요구와 근거</h4>
+    <div className="complaint-report-summary">
+      <h4>대화 요약</h4>
+      <p>{report.summary}</p>
+    </div>
+    <section className="complaint-reason-evidence" aria-labelledby="complaint-reason-evidence-title">
+      <div className="complaint-evidence-heading">
+        <span className="tag">핵심 근거</span>
+        <h4 id="complaint-reason-evidence-title">교사 신청 사유를 뒷받침하는 대화</h4>
+      </div>
+      {report.reason_evidence.length === 0 ? <p className="info">대화 원문에서 직접 확인된 근거가 없습니다. 교사가 적은 사유와 원문 기록을 함께 검토해 주세요.</p> :
+        <ol className="report-evidence complaint-reason-list">{report.reason_evidence.map((evidence) => <EvidenceReference key={`${evidence.message_id}-${evidence.quote}`} evidence={evidence}>
+          <p className="complaint-evidence-explanation">{evidence.explanation}</p></EvidenceReference>)}</ol>}
+    </section>
+    <div className="report-metrics complaint-metrics" aria-label="분석 건수">
+      <div><strong>{conversationCount}</strong><span>이관한 대화</span></div>
+      <button type="button" className="complaint-metric-toggle" aria-expanded={openEvidence === 'rude'}
+        aria-controls="complaint-rude-evidence" onClick={() => toggleEvidence('rude')}>
+        <strong>{report.rude_messages}</strong><span>거친 표현 메시지</span><small>{openEvidence === 'rude' ? '근거 닫기 ↑' : '근거 보기 ↓'}</small>
+      </button>
+      <button type="button" className="complaint-metric-toggle" aria-expanded={openEvidence === 'repeated'}
+        aria-controls="complaint-repeated-evidence" onClick={() => toggleEvidence('repeated')}>
+        <strong>{report.repeated_demands_count}</strong><span>반복 요구 메시지</span><small>{openEvidence === 'repeated' ? '근거 닫기 ↑' : '근거 보기 ↓'}</small>
+      </button>
+    </div>
+    <section id="complaint-rude-evidence" className="complaint-secondary-evidence" aria-label="거친 표현 근거" hidden={openEvidence !== 'rude'}>
+      <h4>거친 표현 근거</h4>
+      {report.rude_evidence.length === 0 ? <p className="info">확인된 거친 표현 근거가 없습니다.</p> :
+        <ol className="report-evidence">{report.rude_evidence.map((evidence) => <EvidenceReference key={evidence.message_id} evidence={evidence}>
+          <small>{evidence.types.join(' · ')}</small></EvidenceReference>)}</ol>}
+    </section>
+    <section id="complaint-repeated-evidence" className="complaint-secondary-evidence" aria-label="반복된 요구와 근거" hidden={openEvidence !== 'repeated'}>
+      <h4>반복된 요구와 근거</h4>
       {report.repeated_demands.length === 0 ? <p className="info">확인된 반복 요구가 없습니다.</p> : report.repeated_demands.map((item, index) =>
         <div key={`${item.theme}-${index}`} className="complaint-evidence-group"><b>{item.theme}</b>
           <ol className="report-evidence">{item.evidence.map((evidence) => <EvidenceReference key={evidence.message_id} evidence={evidence} />)}</ol>
         </div>)}
-    </section>
-    <section className="report-section"><h4>교사 신청 사유를 뒷받침하는 대화</h4>
-      {report.reason_evidence.length === 0 ? <p className="info">직접 확인된 근거가 없습니다.</p> :
-        <ol className="report-evidence">{report.reason_evidence.map((evidence) => <EvidenceReference key={evidence.message_id} evidence={evidence}>
-          <p>{evidence.explanation}</p></EvidenceReference>)}</ol>}
-    </section>
-    <section className="report-section"><h4>거친 표현 근거</h4>
-      {report.rude_evidence.length === 0 ? <p className="info">확인된 거친 표현 근거가 없습니다.</p> :
-        <ol className="report-evidence">{report.rude_evidence.map((evidence) => <EvidenceReference key={evidence.message_id} evidence={evidence}>
-          <small>{evidence.types.join(' · ')}</small></EvidenceReference>)}</ol>}
     </section>
   </section>
 }
@@ -167,15 +194,16 @@ function TeamApplicationDetail({ caseId, onBack }: { caseId: number; onBack: () 
       <h2>민원 이관 신청서</h2>
       <p className="sub">{complaint.teacher_name} 선생님 · {complaint.parent_name} 학부모 · {formatTime(complaint.created_at)}</p>
       <span className="tag">{STATUS_LABEL[complaint.status]}</span>
-      <section className="report-section"><h3>교사가 작성한 이관 사유</h3><p className="report-reason">{complaint.reason}</p></section>
+      <section className="report-section complaint-submitted-reason"><h3>교사가 작성한 이관 사유</h3><p className="report-reason">{complaint.reason}</p></section>
       {complaint.report_status === 'pending' && <p className="report-policy">AI가 선택된 대화를 분석해 보고서를 작성하고 있습니다.</p>}
       {complaint.report_status === 'failed' && <p className="alert" role="alert">보고서를 작성하지 못했습니다. {complaint.report_error ?? ''}</p>}
       {canRetry && <div className="complaint-report-failed">
         <button type="button" className="outline" onClick={() => void retry()} disabled={retrying}>{retrying ? '다시 만드는 중…' : '보고서 다시 만들기'}</button>
         {retryError && <p className="alert" role="alert">{retryError}</p>}
       </div>}
-      {complaint.report && <ReportView report={complaint.report} />}
-      <section className="report-section"><h3>선택된 대화 · 원문 기록</h3>
+      {complaint.report && <ReportView report={complaint.report}
+        conversationCount={complaint.conversations.length} />}
+      <section className="report-section complaint-transcript-section"><h3>선택된 대화 · 원문 기록</h3>
         <p className="info">교사에게 정제되어 보인 메시지도 여기서는 학부모 원문과 전달된 문장을 구분해 확인할 수 있습니다.</p>
         {complaint.conversations.map((conversation) => <details key={conversation.id} className="report-conversation" open>
           <summary>대화 #{conversation.id} · {conversation.student_name}
@@ -213,8 +241,11 @@ function TeamChatTab({ channel }: { channel: ComplaintChannel }) {
   const selectedId = Number(params.get('case')) || null
   const selected = chats.find((chat) => chat.case_id === selectedId) ?? null
   const label = channel === 'parent' ? '학부모' : '교사'
-  if (selected) return <ComplaintChatThread key={`${selected.case_id}-${channel}`} caseId={selected.case_id} channel={channel}
-    counterpartName={selected.counterpart_name} status={selected.status} onBack={() => setParams({})} />
+  if (selected) return <>
+    <Link className="complaint-case-jump" to={`/team?case=${selected.case_id}`}>신청서 #{selected.case_id} 바로 보기 →</Link>
+    <ComplaintChatThread key={`${selected.case_id}-${channel}`} caseId={selected.case_id} channel={channel}
+      counterpartName={selected.counterpart_name} status={selected.status} onBack={() => setParams({})} />
+  </>
   const shown = chats.filter((chat) => chat.status === filter)
   return <section className="complaint-page">
     <div className="eyebrow">SCHOOL SUPPORT TEAM</div><h2>{label}채팅</h2>
@@ -234,6 +265,7 @@ function TeamChatTab({ channel }: { channel: ComplaintChannel }) {
         <h3>#{chat.case_id} · {chat.counterpart_name}</h3>
         <p>{chat.last_message_text || '아직 주고받은 메시지가 없습니다.'}</p><small>채팅 열기 ›</small>
       </button>
+      <Link className="complaint-case-jump" to={`/team?case=${chat.case_id}`}>신청서 #{chat.case_id} 보기 →</Link>
     </li>)}</ul>
   </section>
 }

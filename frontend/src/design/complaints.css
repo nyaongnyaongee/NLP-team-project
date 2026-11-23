@@ -75,7 +75,46 @@
 .complaint-case-list button.report-card { cursor: pointer; }
 .complaint-case-list .report-card p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .complaint-chat-open { display: block; width: 100%; margin-top: 14px; }
-.complaint-report { margin-top: 28px; padding-top: 5px; border-top: 1px solid var(--border); }
+.complaint-report { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--border); }
+.complaint-report-heading h3 { margin: 7px 0 6px; font-size: 21px; }
+.complaint-report-heading p { margin: 0 0 15px; color: var(--secondary); font-size: 13px; line-height: 1.7; }
+.complaint-report-summary { padding: 16px; border: 1px solid var(--border); border-radius: 15px; background: var(--white); }
+.complaint-report-summary h4 { margin: 0 0 9px; font-size: 14px; color: var(--primary-strong); }
+.complaint-report-summary p { margin: 0; font-size: 15px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.complaint-metrics { margin-top: 14px; }
+.complaint-metrics > button {
+  width: 100%;
+  padding: 12px 4px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--white);
+  color: var(--navy);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.complaint-metrics > button:hover, .complaint-metrics > button[aria-expanded='true'] { border-color: var(--primary); background: var(--light-blue); }
+.complaint-metrics > button:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.complaint-metrics > button small { display: block; margin-top: 5px; color: var(--primary-strong); font-size: 11px; font-weight: 700; }
+.complaint-reason-evidence {
+  margin-top: 21px;
+  padding: 18px 16px;
+  border: 1px solid #bccdf5;
+  border-left: 5px solid var(--primary);
+  border-radius: 16px;
+  background: #f0f4ff;
+}
+.complaint-evidence-heading .tag { margin-bottom: 8px; }
+.complaint-evidence-heading h4 { margin: 0 0 12px; font-size: 18px; line-height: 1.5; }
+.complaint-reason-evidence .info { margin: 0; }
+.complaint-reason-list { margin: 0; }
+.complaint-reason-list > li { margin: 10px 0; padding: 12px 13px; border: 1px solid #dbe4fa; border-radius: 12px; background: var(--white); }
+.complaint-reason-list > li:last-child { margin-bottom: 0; }
+.complaint-evidence-explanation { padding-top: 8px; border-top: 1px solid var(--border); color: var(--navy); font-weight: 650; }
+.complaint-secondary-evidence { margin-top: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 15px; background: var(--white); }
+.complaint-secondary-evidence[hidden] { display: none !important; }
+.complaint-secondary-evidence h4 { margin: 0 0 10px; font-size: 16px; }
+.complaint-secondary-evidence .info { margin: 0; }
 .complaint-evidence-group { margin: 18px 0; }
 .complaint-evidence-group > b { font-size: 14px; }
 .report-evidence a { color: var(--primary-strong); font-size: 13px; font-weight: 650; }
@@ -84,8 +123,18 @@
 .report-message { scroll-margin-top: 18px; }
 .report-conversation summary { list-style: none; }
 .report-conversation summary::-webkit-details-marker { display: none; }
+.complaint-submitted-reason { margin-top: 23px; padding: 16px; border: 1px solid var(--border); border-radius: 15px; background: var(--white); }
+.complaint-submitted-reason h3 { margin-top: 0; }
+.complaint-submitted-reason .report-reason { margin-bottom: 0; }
+.complaint-transcript-section { margin-top: 26px; padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: #f6f8fc; }
+.complaint-transcript-section h3 { margin-top: 0; }
+.complaint-transcript-section .report-conversation:last-child { margin-bottom: 0; }
 .complaint-detail-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 20px 0; }
 .complaint-detail-actions .outline { display: inline-flex; flex: 1 1 130px; justify-content: center; text-decoration: none; }
+.complaint-case-jump { display: inline-flex; align-items: center; margin: 6px 0 12px; padding: 8px 11px; color: var(--primary-strong); font-size: 13px; font-weight: 700; text-decoration: none; border: 1px solid #d5e3fa; border-radius: 10px; background: var(--light-blue); }
+.complaint-case-jump:hover { border-color: var(--primary); }
+.complaint-case-jump:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.complaint-case-list .complaint-case-jump { margin: 0 0 12px 12px; }
 .complaint-report-failed .outline { margin: 5px 0 10px; }
 .complaint-chat-screen { padding-bottom: 26px; }
 .complaint-chat-log { list-style: none; margin: 16px 0; padding: 0; }
