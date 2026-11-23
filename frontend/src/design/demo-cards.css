@@ -329,3 +329,16 @@
 .compose-home .scenario-card {
   margin-bottom: 10px;
 }
+
+/* 한국어 낱말이 줄 끝에서 쪼개지지 않게 (「책임지는 / 데?」), 문장마다 줄바꿈(\n) 살리기 */
+.scenario-card,
+.scenario-picker,
+.demo-poster {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.scenario-situation,
+.scenario-note,
+.scenario-hint {
+  white-space: pre-line;
+}

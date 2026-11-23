@@ -46,7 +46,11 @@ export default function ScenarioCard({ scenario, compact = false, onClose, close
             ))}
           </ul>
           {scenario.note && <p className="scenario-note">{scenario.note}</p>}
-          <p className="scenario-rule">참지 말고 보내세요. <b>욕설 · 반말 대환영.</b> 선생님 화면에 어떻게 도착하는지는… 보내 보면 압니다 🔓</p>
+          <p className="scenario-rule">
+            참지 말고 보내세요. <b>욕설 · 반말 대환영.</b>
+            <br />
+            선생님 화면에 어떻게 도착하는지는… 보내 보면 압니다 🔓
+          </p>
           <button type="button" className="link-button" onClick={() => setShowHint((v) => !v)} aria-expanded={showHint}>
             {showHint ? '예시 숨기기' : '막히면? 예시 보기'}
           </button>
