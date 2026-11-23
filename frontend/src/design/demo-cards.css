@@ -180,3 +180,9 @@
     font-size: 18px;
   }
 }
+
+/* 입장 화면: 이미 들어와 있던 학부모가 카드만 바꿔 계속하기 */
+.scenario-continue {
+  width: 100%;
+  margin-bottom: 10px;
+}

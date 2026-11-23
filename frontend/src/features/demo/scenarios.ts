@@ -1,5 +1,6 @@
 // 시연용 역할 카드 (실제 교권침해 사례 모음집을 각색). QR 주소 /join?code=…&card=<id> 로 들어오면
-// 학부모 「메시지 작성」 위에 이 카드가 뜬다. 고른 카드는 이 폰의 localStorage 에만 둔다 (서버에 안 보냄).
+// 학부모 「메시지 작성」 위에 이 카드가 뜬다. 고른 카드는 이 폰에만 둔다 (서버에 안 보냄).
+// 로그인과 같이: 탭(sessionStorage)을 먼저, 없으면 브라우저(localStorage). 한 노트북에서 탭마다 다른 카드로 시험할 수 있게.
 
 export type Scenario = {
   id: string
@@ -96,7 +97,7 @@ const KEY = 'ieum.demoCard'
 
 export function loadScenarioId(): string | null {
   try {
-    return localStorage.getItem(KEY)
+    return sessionStorage.getItem(KEY) ?? localStorage.getItem(KEY)
   } catch {
     return null
   }
@@ -104,8 +105,13 @@ export function loadScenarioId(): string | null {
 
 export function saveScenarioId(id: string | null): void {
   try {
-    if (id) localStorage.setItem(KEY, id)
-    else localStorage.removeItem(KEY)
+    if (id) {
+      sessionStorage.setItem(KEY, id)
+      localStorage.setItem(KEY, id)
+    } else {
+      sessionStorage.removeItem(KEY)
+      localStorage.removeItem(KEY)
+    }
   } catch {
     // 저장하지 못해도 이번 화면에는 보인다
   }
