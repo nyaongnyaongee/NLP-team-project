@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { getInviteCode } from '../../api/students'
 import { useResource } from '../chat/useResource'
@@ -44,6 +45,7 @@ export default function InviteCard() {
           {qr ? <img src={qr} alt={`${joinUrl} 로 가는 QR 코드`} /> : <p className="loading">QR 만드는 중</p>}
           <small>{joinUrl}</small>
           <p className="sub">QR 로 열고 초대 코드 · 자녀 이름 · 보호자 이름을 적으면 바로 연결돼요</p>
+          <Link to="/teacher/cards" className="link-button">🎭 시연 QR 보기 ›</Link>
         </div>
       )}
     </section>

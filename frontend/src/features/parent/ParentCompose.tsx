@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { listStartable, startConversation } from '../../api/conversations'
 import { sendMessage } from '../../api/messages'
 import type { Startable } from '../../api/types'
@@ -7,6 +7,8 @@ import { useAuth } from '../../auth/AuthContext'
 import { SCHOOL_NAME } from '../../components/AppShell'
 import AddChild from '../chat/AddChild'
 import { useResource } from '../chat/useResource'
+import ScenarioCard from '../demo/ScenarioCard'
+import { PICK, findScenario, loadScenarioId, saveScenarioId } from '../demo/scenarios'
 
 const NONE: Startable[] = []
 const MAX = 2000
@@ -40,10 +42,13 @@ export default function ParentCompose() {
   const { data: kids, setData, loaded, error } = useResource(load, NONE)
   const [pickedId, setPickedId] = useState<number | null>(null)
   const [text, setText] = useState('')
-  const [showTemplates, setShowTemplates] = useState(true)
+  const [showTemplates, setShowTemplates] = useState(() => !loadScenarioId()) // 역할 카드가 있으면 틀은 접어 둔다
   const textRef = useRef<HTMLTextAreaElement>(null)
   const [busy, setBusy] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  // 시연 역할 카드 (시연 QR 로 들어왔을 때): null = 시연 아님, PICK = 아직 안 고름 → 상황 고르기 화면으로, 그 밖 = 고른 카드
+  const [demoId] = useState(() => loadScenarioId())
+  const scenario = findScenario(demoId)
 
   const picked = kids.find((k) => k.student_id === pickedId) ?? kids[0] ?? null
   const given = picked ? picked.student_name.replace(/^[가-힣](?=[가-힣]{2}$)/, '') : '아이' // 박지민 → 지민
@@ -79,14 +84,61 @@ export default function ParentCompose() {
     }
   }
 
+  // 받는 선생님 카드: 시연 상황 카드가 있으면 작은 칩으로 상황 카드 위에, 없으면 원래 큰 카드로 아래에
+  const teacherCards = (
+    <div className={`teacher-cards${scenario ? ' compact' : ''}`} role={kids.length > 1 ? 'radiogroup' : undefined} aria-label="받는 선생님">
+      {kids.map((k) => {
+        const on = picked?.student_id === k.student_id
+        return (
+          <button
+            key={k.student_id}
+            type="button"
+            className={`teacher-card${on ? ' on' : ''}`}
+            role={kids.length > 1 ? 'radio' : undefined}
+            aria-checked={kids.length > 1 ? on : undefined}
+            onClick={() => setPickedId(k.student_id)}
+          >
+            <span className={`avatar${scenario ? '' : ' big'}`}>{k.teacher_name.slice(0, 1)}</span>
+            <span>
+              <b>{k.teacher_name} 선생님{scenario ? '께' : ''}</b>
+              <small>
+                {SCHOOL_NAME} · {k.student_name} 담임
+              </small>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  if (demoId === PICK) return <Navigate to="/parent/pick" replace />
+
   return (
     <section className="compose-home">
-      <h2 className="hero-title">
-        선생님께
-        <br />
-        이야기를 전해보세요.
-      </h2>
-      <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
+      {/* 시연 상황 카드가 있으면 큰 제목 · 큰 선생님 카드를 줄여, 카드를 보면서 바로 아래 입력칸에 쓰게 한다 */}
+      {!scenario && (
+        <>
+          <h2 className="hero-title">
+            선생님께
+            <br />
+            이야기를 전해보세요.
+          </h2>
+          <p className="sub">{session?.name} 학부모님의 소통 공간입니다.</p>
+        </>
+      )}
+
+      {scenario && teacherCards}
+      {scenario && (
+        <ScenarioCard
+          key={scenario.id}
+          scenario={scenario}
+          closeLabel="다른 상황 고르기"
+          onClose={() => {
+            saveScenarioId(PICK)
+            navigate('/parent/pick')
+          }}
+        />
+      )}
 
       {!loaded && !error && <p className="loading">불러오는 중</p>}
       {error && <p className="alert" role="alert">{error}</p>}
@@ -97,30 +149,8 @@ export default function ParentCompose() {
           담임 선생님께 받은 초대 코드로 자녀를 추가해 주세요.
         </div>
       )}
-      <div className="teacher-cards" role={kids.length > 1 ? 'radiogroup' : undefined} aria-label="받는 선생님">
-        {kids.map((k) => {
-          const on = picked?.student_id === k.student_id
-          return (
-            <button
-              key={k.student_id}
-              type="button"
-              className={`teacher-card${on ? ' on' : ''}`}
-              role={kids.length > 1 ? 'radio' : undefined}
-              aria-checked={kids.length > 1 ? on : undefined}
-              onClick={() => setPickedId(k.student_id)}
-            >
-              <span className="avatar big">{k.teacher_name.slice(0, 1)}</span>
-              <span>
-                <b>{k.teacher_name} 선생님</b>
-                <small>
-                  {SCHOOL_NAME} · {k.student_name} 담임
-                </small>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-      {loaded && (
+      {!scenario && teacherCards}
+      {loaded && !scenario && (
         <AddChild
           onAdded={(s) => {
             setData((rows) => [...rows, s])
@@ -131,20 +161,24 @@ export default function ParentCompose() {
 
       {picked && (
         <>
-          <div className="compose-head">
-            <h3>메시지 작성</h3>
-            <button type="button" className="link-button" onClick={() => setShowTemplates((v) => !v)}>
-              {showTemplates ? '자주 쓰는 글 숨기기' : '자주 쓰는 글'}
-            </button>
-          </div>
-          {showTemplates && (
-            <div className="example-chips">
-              {TEMPLATES.map((t) => (
-                <button key={t.label} type="button" onClick={() => applyTemplate(t.text)}>
-                  {t.label}
+          {!scenario && (
+            <>
+              <div className="compose-head">
+                <h3>메시지 작성</h3>
+                <button type="button" className="link-button" onClick={() => setShowTemplates((v) => !v)}>
+                  {showTemplates ? '자주 쓰는 글 숨기기' : '자주 쓰는 글'}
                 </button>
-              ))}
-            </div>
+              </div>
+              {showTemplates && (
+                <div className="example-chips">
+                  {TEMPLATES.map((t) => (
+                    <button key={t.label} type="button" onClick={() => applyTemplate(t.text)}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <textarea
             ref={textRef}

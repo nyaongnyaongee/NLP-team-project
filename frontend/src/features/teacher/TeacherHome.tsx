@@ -15,6 +15,7 @@ import { useSync } from '../../realtime/useSync'
 import ConversationsTab from './ConversationsTab'
 import StudentsTab from './StudentsTab'
 import TeacherComplaints from '../complaints/TeacherComplaints'
+import DemoCardsPage from '../demo/DemoCardsPage'
 
 const EMPTY_CHATS: ComplaintChatSummary[] = []
 
@@ -42,6 +43,7 @@ export default function TeacherHome() {
         <Route path="todos" element={<TodosTab />} />
         <Route path="calendar" element={<CalendarTab />} />
         <Route path="students/*" element={<StudentsTab />} />
+        <Route path="cards" element={<DemoCardsPage />} />
         <Route path="notices/*" element={<TeacherNotices />} />
         <Route path="complaints/*" element={
           <TeacherComplaints chats={complaintChats} chatsLoaded={chatsLoaded} chatsError={chatsError} refreshChats={refreshChats} />

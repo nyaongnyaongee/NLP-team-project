@@ -4,6 +4,7 @@ import BottomNav, { type NavItem } from '../../components/BottomNav'
 import { CalendarIcon, ChatIcon, NoticeIcon, PenIcon } from '../../components/icons'
 import { useConversations } from '../chat/useConversations'
 import ParentNotices from '../notices/ParentNotices'
+import ScenarioPicker from '../demo/ScenarioPicker'
 import ParentCalendar from './ParentCalendar'
 import ParentCompose from './ParentCompose'
 import ParentComplaintChat from './ParentComplaintChat'
@@ -25,6 +26,7 @@ export default function ParentHome() {
     <AppShell title="학부모" nav={<BottomNav items={nav} label="학부모 메뉴" />}>
       <Routes>
         <Route index element={<ParentCompose />} />
+        <Route path="pick" element={<ScenarioPicker />} />
         <Route path="chats" element={<ParentConversationTab />} />
         <Route path="support" element={<ParentComplaintChat />} />
         <Route path="calendar" element={<ParentCalendar />} />
